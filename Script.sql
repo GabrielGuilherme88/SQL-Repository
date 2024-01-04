@@ -1,0 +1,17 @@
+select tca.datacriacaoagdt,
+    tca.datadoatendimento,
+    tca.id_unidade,
+    tca.nome_unidade,
+    tca.nome_procedimento,
+    tca.nome_profissionais,
+    tca.nome_especialidade,
+    tca.id_canal,
+    tca.tabela_id,
+    tca.totalagendamentos,
+    tca.nome_canal,
+    tca.nome_status,
+    tca.id_profissional,
+    tca.id_especialidade,
+    tca.id_funcionario,
+    tca.id_sexo
+from public.tb_consolidacao_agendamentos_hist tca
