@@ -3,7 +3,8 @@ from pdgt_amorsaude_financeiro.fl_receita_bruta r
 --where r.id_unidade = 19611
 where r."data" between date('2023-11-01') and date('2023-11-26') 
 
-select sum(Total_Recebido) as total_recebido, sum(Total_Royalties) as royalties
+select sum(Total_Recebido) as total_recebido, sum(Total_Royalties) as royalties, 
+SUBSTRING(idcontas FROM 1 FOR 4) AS quatro_primeiras_letras
 from (
 with mov as (
 select 
@@ -140,6 +141,7 @@ select
  from todos_data_lake_trusted_feegow.unidades_regioes
 )
 select 
+idcontas,
 round(sum(x.totalrecebido), 2) as "Total_Recebido"
 , round(sum(x.totalroyalties), 2) as "Total_Royalties"
 , data
@@ -147,6 +149,7 @@ round(sum(x.totalrecebido), 2) as "Total_Recebido"
 , forma_pagamento
 from (
 select
+t.id as idcontas,
 t.data "Data",
 und.nome_fantasia,
 und.id as id_unidade,
@@ -255,6 +258,7 @@ idesc.id, mov.id, ii.valor_custo_calculado, mov.data, tef.sellerid, mov.unidade_
   ) as tp on t.tipo = tp.tipo
 --and if('[tipo]'=0, true,tp.id = '[tipo]') and if('[paymentmethod]'=0, true,t.paymentmethodid = '[paymentmethod]')
   group by
+  t.id, --add
   und.id,
   t.data,
   t.unidade_id,
@@ -270,11 +274,11 @@ idesc.id, mov.id, ii.valor_custo_calculado, mov.data, tef.sellerid, mov.unidade_
   order by
   t.data,
   t.unidade_id,
-  t.formapagto ) x group by x.id_unidade, x.data, forma_pagamento
+  t.formapagto ) x group by x.id_unidade, x.data, forma_pagamento, idcontas --add
   ) rb
 --where rb.id_unidade = 19611
-where rb."data" between date('2023-11-01') and date('2023-11-26')
---group by id_unidade
+where rb."data" between date('2023-12-01') and date('2023-12-30')
+group by SUBSTRING(idcontas FROM 1 FOR 4)
 --order by id_unidade asc
 
 
@@ -975,121 +979,19 @@ select * from pdgt_sandbox_gabrielguilherme.fl_consultas_crm
 select * from todos_data_lake_trusted_feegow.profissionais
 limit 10
 
+select sellerid, details
+from todos_data_lake_trusted_feegow.tef_autorizacao 
+group by details, sellerid
 
+select * from todos_data_lake_trusted_feegow.tabel
 
 ------------------------------------------------------------------------
 --MODELAGEM_PROFISSIONAIS_INATIVAR
-with sp as (
-    select 
-    id,
-	nome_profissional,
-	nascimento,
-	cpf,
-	unidade_id,
-	sys_active,
-	sys_user,
-	ativo,
-	conselho_id,
-	dhup,
-	sys_date
-      from todos_data_lake_trusted_feegow.profissionais
-),
-scp as (
-    select 
-    id,
- 	descricao
-      from todos_data_lake_trusted_feegow.conselhos_profissionais
-),
-spe as (
-    select 
-	profissional_id,
-	especialidade_id,
-	uf_conselho,
-	rqe
-      from todos_data_lake_trusted_feegow.profissional_especialidades
-),
-e as (
-    select 
-    id,
-    nome_especialidade
-      from todos_data_lake_trusted_feegow.especialidades
-),
-puu as (
-    select 
-	profissional_id,
-	unidade_id
-      from todos_data_lake_trusted_feegow.profissionais_unidades
-),
-uu as (
-    select 
-	id,
-	regiao_id,
-	nome_fantasia
-      from todos_data_lake_trusted_feegow.unidades
-),
-ur as (
-    select 
-	id,
-	descricao
-      from todos_data_lake_trusted_feegow.unidades_regioes
-),
-ag as (
-    select 
- 	id,
-	profissional_id,
-	especialidade_id,
-	status_id,
-	data
-      from todos_data_lake_trusted_feegow.agendamentos
-),
-pro as (
-    select 
-	id,
-	tipo_procedimento_id
-      from todos_data_lake_trusted_feegow.procedimentos
-),
-sprot as (
-    select 
-    id
-      from todos_data_lake_trusted_feegow.procedimentos_tipos
-),
-ap as (
-    select 
-	agendamento_id,
-	procedimento_id
-      from todos_data_lake_trusted_feegow.agendamento_procedimentos
-),
-sgf as (
-    select 
-	fim_vigencia,
-	inicio_vigencia,
-	profissionalid
-      from todos_data_lake_trusted_feegow.grade_fixa
-),
-sgp as (
-    select 
-	data_ate,
-	data_de,
-	profissional_id
-      from todos_data_lake_trusted_feegow.grade_periodo
-),
-su as (
-    select 
-	id,
-	id_relativo,
-	tipo_usuario
-      from todos_data_lake_trusted_feegow.usuarios
-),
-sf as (
-    select 
-	id,
-	nome_funcionario
-      from todos_data_lake_trusted_feegow.funcionarios
-),    
-qtde_cpf as (
+with qtde_cpf as (
 select sp.cpf as id_cpf,
 	count(distinct sp.id) as id_por_cpf_sysactive1
-from sp
+from
+	todos_data_lake_trusted_feegow.profissionais sp
 where sp.sys_active = 1	
 and sp.ativo = 'on'
 group by
@@ -1100,7 +1002,7 @@ group by
 profissionais_data as (
 select	distinct 
 	sp.id,
-	sp.nome_profissional,
+	sp.nome_profissional ,
 	sp.nascimento,
 	sp.cpf,
 	sp.unidade_id,
@@ -1109,87 +1011,108 @@ select	distinct
 	e.nome_especialidade,
 	spe.rqe,
 	sp.sys_active,
-	sp.sys_user,
+	sp.sys_user ,
 	sp.ativo,
 	qc.id_por_cpf_sysactive1,
 	uu.nome_fantasia ,
 	ur.descricao as regional,
-	sp.dhup as dhup,
+	date(sp.dhup) as dhup,
 	sp.sys_date as sys_date,
 	sf.nome_funcionario,
 	su.tipo_usuario 
-from sp
-left join scp on scp.id = sp.conselho_id
-left join spe on spe.profissional_id = sp.id
-left join e on e.id = spe.especialidade_id
-left join puu on puu.profissional_id = sp.id
-left join uu on	uu.id = puu.unidade_id
-left join ur on	ur.id = uu.regiao_id
-left join qtde_cpf qc on qc.id_cpf = sp.cpf
-left join su on su.id = sp.sys_user
-left join sf on sf.id = su.id_relativo
+from
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on	scp.id = sp.conselho_id
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on	spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on	e.id = spe.especialidade_id
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on	puu.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.unidades uu on	uu.id = puu.unidade_id
+left join todos_data_lake_trusted_feegow.unidades_regioes ur on	ur.id = uu.regiao_id
+left join qtde_cpf qc on	qc.id_cpf = sp.cpf
+left join todos_data_lake_trusted_feegow.usuarios su on su.id = sp.sys_user
+left join todos_data_lake_trusted_feegow.funcionarios sf on sf.id = su.id_relativo
 	--left join com objeto qtde_cpf para identificar quantos cpf existem por profissional
 where
-	1 = 1 
+	1 = 1
 	and sp.id not in (
-					select sp2.id from sp sp2 
-					where sp2.dhup between current_date - interval '16' day and current_date - interval '1' day) --retirar profissionais
+						select sp.id from todos_data_lake_trusted_feegow.profissionais sp 
+						WHERE sp.dhup BETWEEN date_add('day', -30, current_date) AND date_add('day', -1, current_date))
+						--where sp.dhup between current_date - 30 and current_date - 1) --retirar profissionais atualziados nos últimos 15 dias (d-1)
 	and sp.sys_active = 1
 	and sp.ativo = 'on'
 	and uu.id not in (0, 19774, 19793)
 	--faixa de data de 15 dias do seu cadastro
 ),
---O objeto abaixo separa os agendamentos futuros dos profissionais contando os agendamentos ocorridos na data mais recente do banco (d-1) e
+-- O objeto abaixo separa os agendamentos futuros dos profissionais contando os agendamentos ocorridos na data mais recente do banco (d-1) e
 -- os futuros. Ou seja, caso o profissional tenha algum agendamento no futuro ou na data de hoje(d-1) é considerado como ativo
-agendamento_futuro as (
+atendimento_60d as (
 select
-	sp.id as id_profissional_futuro,
+	prof.id as id_profissional_futuro,
 	count(*) as qtde
-from ap
-left join ag on ap.agendamento_id = ag.id
-left join sp on ag.profissional_id = sp.id
-left join e on ag.especialidade_id = e.id
-left join pro on ap.procedimento_id = pro.id
-left join sprot on pro.tipo_procedimento_id = sprot.id
+from
+	todos_data_lake_trusted_feegow.agendamento_procedimentos ap
+left join todos_data_lake_trusted_feegow.agendamentos ag on ap.agendamento_id = ag.id
+left join todos_data_lake_trusted_feegow.profissionais prof on	ag.profissional_id = prof.id
+left join todos_data_lake_trusted_feegow.especialidades esp on	ag.especialidade_id = esp.id
+left join todos_data_lake_trusted_feegow.procedimentos pro on	ap.procedimento_id = pro.id
+left join todos_data_lake_trusted_feegow.procedimentos_tipos sprot on	pro.tipo_procedimento_id = sprot.id
 where
 	1 = 1
-	and ag."data" between current_date - interval '60' day and date('2030-01-01')
-		--and sprot.id in (2, 9) --retirando consulta e retorno
-	and ag.status_id in (33, 207, 202, 2, 200, 203, 5, 204, 201, 205, 4, 206, 3)
+	--and ag."data" between current_date - 60 and date('2030-01-01')
+	AND ag."data" BETWEEN date_add('day', -60, current_date) AND date '2030-01-01'
+	--and sprot.id in (2, 9) --retirando consulta e retorno
+and ag.status_id in (33, 207, 202, 2, 200, 203, 5, 204, 201, 205, 4, 206, 3)
 	group by
-		sp.id
+		prof.id
 ),
---considera apenas consulta e retorno para os agendamentos
---O objeto abaixo separa as grades futuras, dessas forma é possível ver se existem grades de atendimento no sistema, considerando a mesma regra do agendamento.
---Ou seja, existem grandes abertas hoje (d-1) e no futuro?
---E também considera profissionais com qualquer tipo de grade aberta no passado em até 60 dias anteriores
+agendamento_futuro as (
+select
+	prof.id as id_profissional_futuro_agendamento,
+	count(*) as qtde
+from
+	todos_data_lake_trusted_feegow.agendamento_procedimentos ap
+left join todos_data_lake_trusted_feegow.agendamentos ag on ap.agendamento_id = ag.id
+left join todos_data_lake_trusted_feegow.profissionais prof on	ag.profissional_id = prof.id
+left join todos_data_lake_trusted_feegow.especialidades esp on	ag.especialidade_id = esp.id
+left join todos_data_lake_trusted_feegow.procedimentos pro on	ap.procedimento_id = pro.id
+left join todos_data_lake_trusted_feegow.procedimentos_tipos sprot on	pro.tipo_procedimento_id = sprot.id
+where
+	1 = 1
+	AND ag."data" BETWEEN current_date AND date('2030-01-01')
+	and sprot.id in (2, 9) --retirando consulta e retorno
+	group by
+		prof.id
+),
 grade_futuras_fixas as (
 select 
 	distinct sp.id as id_profissional_grade
 from
-	 sgf
-left join  sp on sp.id = sgf.profissionalid
+	todos_data_lake_trusted_feegow.grade_fixa sgf
+left join todos_data_lake_trusted_feegow.profissionais sp on sp.id = sgf.profissionalid
 where
 	1 = 1
 	and sp.sys_active = 1
 	and sp.ativo = 'on'
-	and sgf.fim_vigencia between current_date - interval '1' day and date('2030-12-31')
-	-- pega todas as grades com fim de vigencia (em aberto) a partir de hoje até o futuro
-		and sgf.inicio_vigencia between current_date - interval '1' day and date('2030-12-31')
-		-- pega profissionais que tiveram alguma grade aberta em 60 dias com a data corrente de hoje
+	--and sgf.inicio_vigencia between current_date - 1 and date('2030-12-31')
+	-- pega profissionais que tiveram alguma grade aberta em 60 dias com a data corrente de hoje
+	--and sgf.fim_vigencia between current_date -1 and date('2030-12-31')
+	AND sgf.fim_vigencia BETWEEN date_add('day', -1, current_date) AND date '2030-12-31'
+	-- pega todas as grades com fim de vigencia (em aberto) a partir de hoje até o futuro		
 ),
 grade_futuras_periodo as (
 select 
 	distinct sp.id as id_profissional_grade_periodo
-from sgp
-left join sp on sp.id = sgp.profissional_id
+from
+	todos_data_lake_trusted_feegow.grade_periodo sgp
+left join todos_data_lake_trusted_feegow.profissionais sp on	sp.id = sgp.profissional_id
 where
 	1 = 1
 	and sp.sys_active = 1
 	and sp.ativo = 'on'
-	and sgp.data_de between current_date - interval '1' day and  date('2030-12-31')
+	--and sgp.data_de between current_date -1 and date('2030-12-31')
 	--pega todas as grades com fim de vigencia (em aberto) a partir de hoje até o futuro
-	and sgp.data_ate between current_date - interval '1' day and date('2030-12-31')
+	--and sgp.data_ate between current_date - 1 and date('2030-12-31')
+	AND sgp.data_ate BETWEEN date_add('day', -1, current_date) AND date '2030-12-31'
 	-- pega profissionais que tiveram alguma grade aberta em 60 dias com a data corrente de hoje
 ),
 --O objeto abaixo consolida os objetos acima, ou seja, faz o left join e retira-se qualquer informação em comum.
@@ -1197,10 +1120,11 @@ where
 --Retira também qualquer profissional que não tem agendamento futuro
 --Considera também qualquer profissional que tenha sido registrado ou atualizado na feegow nos últimosd 15 dias
 resultado as (
-select
-	*
-from profissionais_data pd
-left join agendamento_futuro af on	af.id_profissional_futuro = pd.id
+select *
+from
+	profissionais_data pd
+left join atendimento_60d ag on	ag.id_profissional_futuro = pd.id
+left join agendamento_futuro af on af.id_profissional_futuro_agendamento = pd.id 
 left join grade_futuras_fixas gf on	gf.id_profissional_grade = pd.id
 left join grade_futuras_periodo gfpe on	gfpe.id_profissional_grade_periodo = pd.id
 where
@@ -1211,9 +1135,10 @@ where
 	--retira os null -> tudo que não tem grade futura
 	and id_profissional_grade_periodo is null
 	--retira os null -> que não tem grade período
+	and id_profissional_futuro_agendamento is null
 )
 --query com o objeto final já filtrado.
-select 
+select
 	id,
 	nome_profissional,
 	nascimento,
@@ -1232,101 +1157,54 @@ select
 	sys_date,
 	nome_funcionario,
 	tipo_usuario 
-from resultado
+from
+	resultado
 where
 	1 = 1
-	--and nome_profissional = 'Adriana Cardoso Gonçalves'
 	--separar profissional para validação. O mesmo aparece na lista pois possui dois id diferentes para o mesmo cpf e também sysuser = 0 --conversar com a marjorie sobre o sys user = 0
+and id not in
+( --retirando profissionais que possuem a central como unidade cadastrada
+select  distinct sp.id from todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on	puu.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.unidades uu on	uu.id = puu.unidade_id
+where uu.id in (0, 19774, 19793)
+)
+and id not in
+( --retirando profissionais que tem a especialidade 256	Biomedicina 168	Enfermagem
+select sp.id from todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on	spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on	e.id = spe.especialidade_id
+where e.id in (256, 168)
+)
+--and id = 503578
 order by
 	nome_profissional
 	
---MODELAGEM_VMK
-with cr as (
-   SELECT 
-datapagamento,
-cpfpaciente,
-credito_debito,
-id_procedimento,
-nomegrupo,
-nome_procedimento,
-sys_active,
-id_unidade,
-regional,
-nome_unidade,
-quantidade,
-valor_pago,
-categoria,
-subcategoria,
-id_tabela,
-nome_tabela_particular,
-id_paciente
-    from pdgt_amorsaude_financeiro.fl_contas_a_receber
-),
-p AS (
-    SELECT
-id,
-nome_paciente,
-email
-    from todos_data_lake_trusted_feegow.pacientes
-),
-pe AS (
-    SELECT
-paciente_id,
-estado,
-cidade,
-cep,
-bairro,
-logradouro,
-complemento,
-numero
-    from todos_data_lake_trusted_feegow.paciente_endereco
-)
-select 
-cr.datapagamento,
-cr.cpfpaciente,
-cr.credito_debito,
-cr.id_procedimento,
-cr.nomegrupo,
-cr.nome_procedimento,
-cr.sys_active,
-cr.id_unidade,
-cr.regional,
-cr.nome_unidade,
-cr.quantidade,
-cr.valor_pago,
-cr.categoria,
-cr.subcategoria,
-cr.id_tabela,
-cr.nome_tabela_particular,
-p.email,
-p.nome_paciente,
-pe.estado,
-pe.cidade,
-pe.cep,
-pe.bairro,
-pe.logradouro,
-pe.complemento,
-pe.numero
-from cr
-left join p on p.id = cr.id_paciente
-left join pe on pe.paciente_id = p.id
-where cr.id_unidade in (19457,19823,19485,19366,19812,19803,19624,19918,19848,
-19670,19811,19329,19308,19850,19649,19304,19272,19457,19350,19610,19516,19409,
-19431,19771,19827,19294,19292, 19669, 19932, 19615, 19820)
---and cpfpaciente = '40335764878'
-limit 200
+select * from todos_data_lake_trusted_feegow.procedimentos_tabelas_precos 
+	
+------------------------------------------
+--modelagem_IMPORTAÇÃO_DE_PROCEDIMENTOS
+select
+  u.id AS Unidades_id,
+  u.nome_fantasia as Unidades_nome_fantasia,
+  stg_procedimentos_tabelas_precos.id AS id,
+  p.id AS Procedimentos_id,
+  stg_procedimentos_tabelas_precos.nometabela,
+  p.nome_procedimento AS Procedimentos_nome_procedimento
+FROM todos_data_lake_trusted_feegow.procedimentos_tabelas_precos as stg_procedimentos_tabelas_precos
+LEFT JOIN todos_data_lake_trusted_feegow.procedimentos_tabelas_precos_unidades AS ptpu ON stg_procedimentos_tabelas_precos.id = ptpu.procedimento_tabela_preco_id
+  LEFT JOIN todos_data_lake_trusted_feegow.procedimentos_tabelas_precos_valores as ptpv ON stg_procedimentos_tabelas_precos.id = ptpv.tabelaid
+  LEFT JOIN todos_data_lake_trusted_feegow.procedimentos AS p ON ptpv.procedimentoid = p.id
+  LEFT JOIN todos_data_lake_trusted_feegow.unidades AS u ON ptpu.unidade_id = u.id
+where 1=1 
+ and p.ativo = 'on'
+ and stg_procedimentos_tabelas_precos.id in(3024066, 3024345, 700506)
+ and u.id = 19872
+ORDER BY
+  stg_procedimentos_tabelas_precos.nometabela DESC
 
-select * from pdgt_sandbox_gabrielguilherme.fl_contas_a_receber_vmk vmk
-where vmk.cpfpaciente  = '19965826404'
-limit 100
+ ---------------------------------------------------------------
 
-select * from pdgt_amorsaude_financeiro.fl_contas_a_receber_vmk vmk
-where vmk.cpfpaciente  = '19965826404'
-limit 100
-
-select * from todos_data_lake_trusted_feegow.pacientes p
-left join todos_data_lake_trusted_feegow.paciente_endereco e on e.paciente_id = p.id
-where p.cpf = '19965826404'
 
 
 --MODELAGEM_contas_a_receber
@@ -1382,6 +1260,24 @@ select
 from todos_data_lake_trusted_feegow.contas
 ),
 ii as (
+select 
+	id,
+	conta_id,
+	pacote_id,
+	categoria_id,
+	procedimento_id,
+	tipo_item_id,
+	quantidade,
+	valor_unitario,
+	acrescimo,
+	desconto,
+	is_executado,
+	is_cancelado,
+    executante_associacao_id,
+    executante_id
+from todos_data_lake_trusted_feegow.conta_itens
+),
+iii as (
 select 
 	id,
 	conta_id,
@@ -1551,27 +1447,7 @@ left join sca on sca.id = ii.executante_associacao_id
 left join sf ON i.associacao_conta_id =2 AND i.conta_id = sf.id
 ),
 final_query as (
-select
-m.id as moviid,
-	m."data" as data,
-	m."data" as datavencimento,
-	movpay."data" as datapagamento,
-	pacconta.CPF cpfpaciente,
-	i.recurrence,
-	pacconta.id id_paciente,
-	pacconta.nome_paciente,
-	--i.credito_debito, --retirado
-	bc.bandeira, --add demanda Uarlass
-	sfdp.forma_pagamento, --add demanda Georgete
-	proc.id as id_procedimento,
-	proc.nome_procedimento,
-	procgrup.nomegrupo,
-	spt.tipoprocedimento, --add
-	i.sys_active,
-	func.id as id_funcionario, --add a pedido da Gabriela Georgete
-	  unit.nome_fantasia as nome_unidade,
-	    unit.id as id_unidade,
-	   max(ii.quantidade) as quantidade, --adicionado max (bateu com a feegow quando olhado batatais) (a antiga era uma subquery com limit 1 que não é suportado no athena)
+select *,
 	    (case
 		when 'S' = 'S' then (SUM(coalesce(idesc.valor, 0)))/ coalesce(i.Recurrence,	1)
 		else coalesce(m.Valor_Pago,	0)	end) Valor_Pago,
@@ -1584,15 +1460,7 @@ m.id as moviid,
 	end) SituacaoConta,
 	(case when m.forma_pagamento_id in (8, 10) then ct.Parcelas
 		else 1
-	end) as Parcelas,
-	cat.name as categoria,
-	subcat.name as subcategoria,
-	tp.id as id_tabela,
-	tp.nome_tabela_particular,
-	ur.id as id_regional, --add
-	ur.descricao as regional,
-	idprof.id_pofissional, --add
-	forn.id_fornecedor
+	end) as Parcelas
 from m 
 inner join i on	i.id = m.conta_id
 inner join ii on ii.conta_id = i.id
@@ -1688,38 +1556,31 @@ group by
 	movpay.data,
 	func.id, --add demanda Georgete
 	idprof.id_pofissional,  --add demanda Georgete
-	bc.bandeira, --add demanda Uarlass 
-	sfdp.forma_pagamento, --add demanda Georgete
-	forn.id_fornecedor --add demanda Georgete
+	--bc.bandeira, --add demanda Uarlass 
+	forn.id_fornecedor,
+    valor_pago
 order by
 	m.Data,
-	m.id
-)
+	m.id)
 select
-	*
-	,
-	--case
+sum(qtde_real)
 	--when datapagamento >= date_add('day', 1 - extract(day from current_date), current_date) AND extract(day from current_date) >= 20
 	--THEN date_format(date_add('day', -4, datapagamento), '%Y-%m')
 	--end as snap
-	case
-	WHEN EXTRACT(MONTH FROM datapagamento) = EXTRACT(MONTH FROM current_date) or EXTRACT(MONTH FROM datapagamento) = EXTRACT(MONTH FROM date_add('day', -4, current_date)) 
-	THEN date_format(date_add('day', -4, datapagamento), '%Y-%m')
-	end as snap,
-	CONCAT(CAST(moviid AS VARCHAR), CAST(datapagamento AS VARCHAR), CAST(id_procedimento AS VARCHAR)) AS uniquekey
+	--case
+	--WHEN EXTRACT(MONTH FROM datapagamento) = EXTRACT(MONTH FROM current_date) or EXTRACT(MONTH FROM datapagamento) = EXTRACT(MONTH FROM date_add('day', -4, current_date)) 
+	--THEN date_format(date_add('day', -4, datapagamento), '%Y-%m')
+	--end as snap,
+	--CONCAT(CAST(moviid AS VARCHAR), CAST(datapagamento AS VARCHAR), CAST(id_procedimento AS VARCHAR)) AS uniquekey
+	--date_format(date_add('day', -4, current_date), '%Y-%m') as snap
 from
 	final_query
 where 1=1
 --AND datapagamento >= date_add('day', 1 - extract(day from current_date), current_date) 
---AND extract(day from current_date) > 21
-	--para validação
-and id_unidade in (19543) --unidades da vmk
-and  datapagamento between date('2023-10-01') and current_date --filtro de data
---group by id_unidade
---order by id_unidade
---and teste1 is not null 
---and teste2 is not null
-order by datapagamento asc
+and datapagamento between date('2024-01-02') and date('2024-01-02') --aqui vocês podem alterar para validação
+and id_unidade =  19680--19680 --aqui vocês podem alterar para validação
+--and nomegrupo in ('Exames Laboratoriais', 'Exames de Imagem', 'Procedimentos', 'Sessão', 'Cirurgia geral', 'Cirurgia Oftalmológica', 'Vacinas',' Terapias Injetaveis')
+
 
 
 
@@ -3272,3 +3133,1651 @@ where dataproposta between date('2023-11-01') and date('2023-11-26')
 group by id_unidade
 order by id_unidade
 
+
+--MODELAGEM DATAQUALITY
+
+with stg_agendamentos as (
+select 'todos_data_lake_trusted_feegow.agendamento' as Tipo, cast(ag."data" as date), count(*) as Registros, 0 as valortotal, su.id as unidade_id
+from todos_data_lake_trusted_feegow.agendamentos ag
+left join todos_data_lake_trusted_feegow.locais sl on sl.id = ag.local_id
+left join todos_data_lake_trusted_feegow.unidades su on su.id = sl.unidade_id
+group by cast(ag."data" as date), su.id),
+stg_movimentacao as (
+select 'todos_data_lake_trusted_feegow.movimentacao' as Tipo, cast(ag."data" as date), count(*) as Registros, 0 as valortotal, ag.unidade_id 
+	from todos_data_lake_trusted_feegow.movimentacao ag
+group by cast(ag."data" as date), ag.unidade_id),
+stg_contas as (
+select 'todos_data_lake_trusted_feegow.contas' as Tipo ,cast(ag.data_referencia as date) as data, count(*) as Registros, 0 as valortotal, ag.unidade_id
+	from todos_data_lake_trusted_feegow.contas ag
+group by cast(ag.data_referencia as date), ag.unidade_id),
+stg_propostas as (
+select 'todos_data_lake_trusted_feegow.propostas' as Tipo, cast(p.dataproposta as date) as data, count(*) as Registros, 0 as valortotal, p.unidadeid as unidade_id
+from todos_data_lake_trusted_feegow.propostas p
+group by cast(p.dataproposta as date),p.unidadeid),
+stg_memed_prescricoes as (
+select 'todos_data_lake_trusted_feegow.memed_prescricoes mp' as Tipo, cast(mp.datahora as date) as data  , count(*) as Registros, 0 as valortotal, sa.unidade_id
+from todos_data_lake_trusted_feegow.memed_prescricoes mp
+left join todos_data_lake_trusted_feegow.atendimentos sa on sa.id = mp.atendimentoid 
+group by cast(mp.datahora as date), sa.unidade_id),
+stg_dc_pdf_assinados as (
+select 'todos_data_lake_trusted_feegow.dc_pdf_assinados' as Tipo, cast(pa.data_criacao as date) as data, count(*) as Registros, 0 as valortotal, ah.unidade_id 
+from todos_data_lake_trusted_feegow.dc_pdf_assinados pa
+left join todos_data_lake_trusted_feegow.atendimentos ah on ah.id = pa.documento_id 
+group by cast(pa.data_criacao as date), ah.unidade_id),
+stg_pacientes_pedido as (
+select 'todos_data_lake_trusted_feegow.pacientes_pedidos' as Tipo, cast(pd."data"  as date) as data, count(*) as Registros, 0 as valortotal, sah.unidade_id
+from todos_data_lake_trusted_feegow.pacientes_pedidos pd
+left join todos_data_lake_trusted_feegow.atendimentos sah on sah.paciente_id  = pd.paciente_id  
+group by cast(pd."data"  as date),sah.unidade_id),
+stg_pacientes_prescricoes as (
+select 'todos_data_lake_trusted_feegow.pacientes_prescricoes' as Tipo, cast(pp."data" as date) as data, count(*) as Registros, 0 as valortotal, sah.unidade_id 
+from todos_data_lake_trusted_feegow.pacientes_prescricoes pp
+left join todos_data_lake_trusted_feegow.atendimentos sah on sah.paciente_id = pp.paciente_id
+group by cast(pp."data" as date), sah.unidade_id),
+stg_agenda_horarios_itens as (
+select 'todos_data_lake_trusted_feegow.agenda_horarios_itens' as Tipo ,cast(hi."data" as date) as data, count(*) as Registros, 0 as valortotal, hi.unidade_id 
+from todos_data_lake_trusted_feegow.agenda_horarios_itens hi
+group by cast(hi."data" as date), hi.unidade_id),
+stg_contas_bloqueios as (
+select 'todos_data_lake_trusted_feegow.contas_bloqueios' as Tipo, cast(cb."data" as date)as data , count(*) as Registros, 0 as valortotal, cb.unidade_id 
+from todos_data_lake_trusted_feegow.contas_bloqueios cb
+group by cast(cb."data" as date), cb.unidade_id),
+stg_atendimentos as (
+select 'todos_data_lake_trusted_feegow.atendimentos' as Tipo, cast(a."data" as date) as data, count(*) as Registros, 0 as valortotal, a.unidade_id 
+from todos_data_lake_trusted_feegow.atendimentos a
+group by cast(a."data" as date), a.unidade_id),
+stg_agendamento_procedimentos as (
+select 'todos_data_lake_trusted_feegow.agendamento_procedimentos sap' as Tipo, cast(sap.dhup as date) as data, count(*) as Registros, 0 as valortotal, su.id as unidade_id
+from todos_data_lake_trusted_feegow.agendamento_procedimentos sap 
+left join todos_data_lake_trusted_feegow.locais sl on sl.id = sap.local_id
+left join todos_data_lake_trusted_feegow.unidades su on su.id = sl.unidade_id 
+group by cast(sap.dhup as date), su.id),
+stg_procedimentos as (
+select 'todos_data_lake_trusted_feegow.procedimentos' as Tipo, cast(sp.dhup as date) as data ,count(*) as Registros, 0 as valortotal, su.id as unidade_id
+from todos_data_lake_trusted_feegow.procedimentos sp
+left join todos_data_lake_trusted_feegow.agendamentos sah on sah.procedimento_id = sp.id
+left join todos_data_lake_trusted_feegow.locais sl on sl.id = sah.local_id 
+left join todos_data_lake_trusted_feegow.unidades su on su.id = sl.unidade_id 
+group by cast(sp.dhup as date), su.id),
+tb_consolidacao_agendamentos_hist as (
+select 'tb_consolidacao_agendamentos_hist' as Tipo, cast(ahi.dt_agendamento as date) as data, count(*) as Registro, 0 as valortotal, ahi.id_unidade as unidade_id 
+from pdgt_amorsaude_operacoes.fl_agendamentos ahi
+group by cast(ahi.dt_agendamento as date), ahi.id_unidade),
+tb_consolidacao_contas_a_receber as (
+select 'tb_consolidacao_contas_a_receber_hi' as Tipo, cast(cr.datavencimento  as date) as data, count(*) as Registros, cr.valor_pago as valortotal, cr.id_unidade  as unidade_id
+from pdgt_amorsaude_financeiro.fl_contas_a_receber cr
+group by cast(cr.datavencimento as date), cr.valor_pago, cr.id_unidade), --problema em varchar dentro do contas a receber
+tb_consolidacao_receita_bruta_hist_final as (
+select 'tb_consolidacao_receita_bruta_hist_final' as Tipo, cast(tcrbhf."data" as date) as data, count(*) as Registros, tcrbhf.total_recebido as valortotal, tcrbhf .id_unidade  as unidade_idc
+from pdgt_amorsaude_financeiro.fl_receita_bruta tcrbhf
+group by cast(tcrbhf."data" as date),tcrbhf.total_recebido, tcrbhf .id_unidade),
+tb_consolidacao_contas_a_pagar_hist as (
+select 'tb_consolidacao_contas_a_pagar_hist' as Tipo, cast(cp."data" as date) as data, count(*) as Registros, cp.valortotal as valortotal, su.id as unidade_id
+from pdgt_amorsaude_financeiro.fl_contas_a_pagar cp
+left join todos_data_lake_trusted_feegow.unidades su on su.nome_fantasia = cp.nm_unidade 
+group by cast(cp."data" as date), cp.valortotal, su.id),
+stg_boletos_emitidos as (
+select 'todos_data_lake_trusted_feegow.boletos_emitidos' as Tipo, cast(be.data_hora as date), count(*) as Registros, 0 as valortotal, be.unidade_id 
+from todos_data_lake_trusted_feegow.boletos_emitidos be
+group by cast(be.data_hora as date), be.unidade_id),
+stg_grade_fixa as (
+select 'todos_data_lake_trusted_feegow.grade_fixa' as Tipo, cast(gf.datahora as date), count(*) as Registros, 0 as valortotal, su.id as unidade_id
+from todos_data_lake_trusted_feegow.grade_fixa gf
+left join todos_data_lake_trusted_feegow.locais sl on sl.id = gf.localid
+left join todos_data_lake_trusted_feegow.unidades su on su.id = sl.unidade_id 
+group by cast(gf.datahora as date), su.id),
+stg_royalties_contas as (
+select 'todos_data_lake_trusted_feegow.grade_fixa' as Tipo, cast(rc.datareferencia as date), count(*) as Registros, 0 as valortotal, rc.unidadeid as unidade_id
+from todos_data_lake_trusted_feegow.royalties_contas rc
+group by cast(rc.datareferencia as date), rc.unidadeid),
+stg_splits as (
+select 'todos_data_lake_trusted_feegow.splits' as Tipo, cast(s."data" as date), count(*) as Registros, 0 as valortotal, smh.unidade_id
+from todos_data_lake_trusted_feegow.splits s
+left join todos_data_lake_trusted_feegow.movimentacao smh on smh.id = s.movimentacao_id 
+group by cast(s."data" as date), smh.unidade_id),
+stg_conta_itens as (
+select 'todos_data_lake_trusted_feegow.conta_itens' as Tipo, cast(sci.data_execucao as date) as data, count(*) as Registros, 0 as valortotal, 0 as unidade_id
+from todos_data_lake_trusted_feegow.conta_itens sci
+--left join todos_data_lake_trusted_feegow.contas scc on scc.conta_id = sci.id
+group by cast(sci.data_execucao as date))
+select * from (
+select * from stg_conta_itens
+union all
+select * from stg_contas sc 
+union all
+select * from stg_splits ss 
+union all
+select * from stg_propostas
+union all
+select * from stg_grade_fixa
+union all
+select * from stg_grade_fixa
+union all
+select * from stg_boletos_emitidos
+union all
+select * from stg_procedimentos
+union all
+select * from stg_agendamento_procedimentos
+union all
+select * from stg_atendimentos
+union all
+select * from stg_dc_pdf_assinados
+union all
+select * from stg_pacientes_pedido
+union all
+select * from stg_pacientes_prescricoes
+union all
+select * from stg_agenda_horarios_itens
+union all
+select * from stg_contas_bloqueios
+union all
+select * from stg_memed_prescricoes
+union all
+select * from stg_agendamentos
+union all
+select * from stg_movimentacao
+union all
+select * from tb_consolidacao_agendamentos_hist
+union all
+select * from tb_consolidacao_contas_a_receber
+union all
+select * from tb_consolidacao_receita_bruta_hist_final
+union all
+select * from tb_consolidacao_contas_a_pagar_hist
+WHERE data BETWEEN date_add('day', -90, current_date) AND current_date --fazer a carga histórica, e depois fazer diário em current_date -1
+and data <= current_date
+order by data desc
+)
+
+
+
+
+--MODELAGEM AGENDAMENTOS AMEI
+SELECT
+	CONCAT(B.nome, ' ', B.sobrenome) AS NOME_PACIENTE,
+	B.cpf,
+	B.email,
+	c2.nome AS nome_canal
+from todos_data_lake_trusted_amei.AGENDAMENTOS A
+LEFT  JOIN todos_data_lake_trusted_amei.PACIENTES B ON	B.id = A.paciente_id AND B.ativo = 1
+LEFT  JOIN todos_data_lake_trusted_amei.AGENDAMENTOS_PROCEDIMENTOS C ON	C.agendamento_id = A.id
+LEFT  JOIN todos_data_lake_trusted_amei.ATENDIMENTOS T ON A.id = T.FK_AGENDAMENTO
+LEFT  JOIN todos_data_lake_trusted_amei.FORNECEDOR_PROCEDIMENTOS F ON C.FK_FORNECEDOR_PROCEDIMENTO_REPASSE = F.ID
+LEFT  JOIN todos_data_lake_trusted_amei.CAMPANHA_VOUCHER_PROCEDIMENTOS V ON	C.FK_CAMPANHA_VOUCHER_PROCEDIMENTOS = V.ID
+LEFT  JOIN todos_data_lake_trusted_amei.CAMPANHA_VOUCHERS CVV ON V.FK_CAMPANHA_VOUCHER = CVV.ID
+LEFT JOIN todos_data_lake_trusted_amei.PROFISSIONAIS P ON P.id = A.profissional_id
+LEFT JOIN todos_data_lake_trusted_amei.UNIDADES U ON U.id = A.clinica_id 
+LEFT JOIN todos_data_lake_trusted_amei.STATUS_AGENDAMENTOS sa ON sa.id = A.status_agendamento_id
+LEFT JOIN todos_data_lake_trusted_amei.CANAIS c2 ON c2.id = A.canal_id 
+WHERE 1 = 1
+AND	A.data BETWEEN date('2024-01-02') AND date('2024-01-07')
+--AND A.clinica_id = 183
+--AND sa.id IN (4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 24, 40)
+
+
+
+
+-----------------------------------------------------------
+--MODELAGEM PROTHEUS WEBDENTAL CLIENTE INCLUIR
+--modelagem final 
+with units as (
+  select
+    id,
+    cnpj,
+    nome_fantasia,
+    nome_unidade,
+    estado,
+    cidade,
+    bairro,
+    endereco,
+    cep,
+    numero,
+    complemento,
+    regiao_id,
+    tel1,
+    tel2,
+    cel1,
+    cel2,
+    parceiro_institucional_id,
+    regime_tributario_id,
+    exibiragendamentoonline,
+    email1,
+    email2,
+    medico_responsavel,
+    cnes,
+    sys_active,
+    sys_user,
+    dhup,
+    grupo_unidade_id,
+    consultor_responsavel,
+    status_unidade_id
+  from todos_data_lake_trusted_feegow.unidades
+),
+forn as (
+  select
+    id,
+    nomefornecedor
+  from todos_data_lake_trusted_feegow.fornecedores
+),
+ur as (
+  select
+    id,
+    descricao
+  from todos_data_lake_trusted_feegow.unidades_regioes
+),
+rt as (
+  select
+    id,
+    nomeregimetributario
+  from todos_data_lake_trusted_feegow.regimes_tributarios
+),
+prof as (
+  select
+    id,
+    nome_profissional
+  from todos_data_lake_trusted_feegow.profissionais
+),
+users as (
+  select
+    id,
+    id_relativo
+  from todos_data_lake_trusted_feegow.usuarios
+),
+func as (
+  select
+    id,
+    nome_funcionario
+  from todos_data_lake_trusted_feegow.funcionarios
+),
+gu as (
+  select
+    id,
+    sigla,
+    descricao
+  from todos_data_lake_trusted_feegow.grupo_unidade
+),
+su as (
+  select
+    id,
+    nome_status
+  from todos_data_lake_trusted_feegow.status_unidade
+), 
+final_query_feegow as ( 
+select 
+  cast(27602235000100 AS VARCHAR) AS cnpjfilial, --adicionado cnpj filial franqueadora amorsaude nos dados da feegow a pedido do time de projetos
+  cast(01001 AS VARCHAR) AS filial,  
+  null as codigomunicipio,
+  units.id as id_unidade,
+  units.cnpj as cnpjcliente,
+  units.nome_fantasia,
+  units.nome_unidade,
+  ur.id,
+  ur.descricao,
+  units.estado,
+  units.cidade,
+  units.bairro,
+  units.endereco,
+  units.cep,
+  units.numero,
+  units.complemento,
+  units.tel1,
+  units.tel2,
+  units.cel1,
+  units.cel2,
+  units.email1,
+  units.email2,
+  forn.nomefornecedor as franquia_cdt,
+  rt.nomeregimetributario as regime_tributario,
+  prof.nome_profissional as rt_medicina,
+  case
+    when units.exibiragendamentoonline  =1 then 'Sim'
+    else 'Não'
+  end as agendas_online,
+  units.cnes,
+  case
+    when units.sys_active =1 then 'Ativo'
+    when units.sys_active =-1 then 'Inativo'
+  end as status_cadastro,
+  func.nome_funcionario as usuario_cadastro,
+  units.dhup as dt_atualizacao,
+  gu.sigla as rating,
+  gu.descricao as desc_rating,
+  units.consultor_responsavel,
+  su.nome_status as status
+from units
+  inner join forn on forn.id = units.parceiro_institucional_id
+  left join ur on units.regiao_id = ur.id
+  left join rt on units.regime_tributario_id = rt.id
+  left join prof on units.medico_responsavel = prof.id
+  left join users on units.sys_user = users.id
+  left join func on users.id_relativo = func.id
+  left join gu on units.grupo_unidade_id = gu.id
+  left join su on units.status_unidade_id = su.id
+),
+units_feegow as ( ----------------------- feegow
+select 
+cnpjfilial,
+	filial,
+	cnpjcliente,
+	nome_unidade as nomecliente,
+	'j' as tipo,
+	nome_fantasia as nomefantasia,
+	endereco,
+	complemento,
+	bairro,
+	estado,
+	codigomunicipio,
+	cidade as municipio,
+	cep,
+	COALESCE(
+    CASE WHEN tel1 IS NOT NULL AND tel1 != '' THEN REGEXP_REPLACE(SUBSTRING(tel1 FROM 2 FOR 4), '[^0-9]', '') END,
+    CASE WHEN tel2 IS NOT NULL AND tel2 != '' THEN REGEXP_REPLACE(SUBSTRING(tel2 FROM 2 FOR 4), '[^0-9]', '') END,
+    CASE WHEN cel1 IS NOT NULL AND cel1 != '' THEN REGEXP_REPLACE(SUBSTRING(cel1 FROM 2 FOR 4), '[^0-9]', '') END
+) AS ddd,
+COALESCE(
+    CASE WHEN tel1 IS NOT NULL AND tel1 != '' THEN REGEXP_REPLACE(SUBSTRING(tel1 FROM 6), '\\s|-', '') END,
+    CASE WHEN tel2 IS NOT NULL AND tel2 != '' THEN REGEXP_REPLACE(SUBSTRING(tel2 FROM 6), '\\s|-', '') END,
+    CASE WHEN cel1 IS NOT NULL AND cel1 != '' THEN REGEXP_REPLACE(SUBSTRING(cel1 FROM 6), '\\s|-', '') END
+) AS telefone,
+email1 as email,
+dt_atualizacao,
+'Feegow' as sistema_origem 
+from final_query_feegow
+),
+ua as ( --aqui começa as tabelas da webdental
+  select
+    *
+  FROM todos_data_lake_trusted_webdental.tbl_unidade_atendimento
+), 
+units_webdental as ( -----------------------  webdental
+  SELECT     
+   cast(27602235000100 AS VARCHAR) AS cnpjfilial, --adicionado cnpj filial franqueadora amorsaude nos dados da feegow a pedido do time de projetos
+  cast(01001 AS VARCHAR) AS filial,
+    REGEXP_REPLACE(ua.cnpj, '[./-]', '') AS cnpjcliente,
+    ua.nm_unidade_atendimento AS nomecliente,
+    'J' AS tipo,
+    COALESCE(NULLIF(ua.nome_fantasia, ''), ua.nm_unidade_atendimento) AS nomefantasia,
+    CONCAT(ua.rua, ', ', ua.numero) AS endereco,
+    ua.complemento,
+    ua.cd_bairro AS bairro,
+    ua.estado,
+    '?' AS codigomunicipio,
+    ua.cd_cidade AS municipio,
+    REPLACE(ua.cep, '-', '') AS cep,
+   CASE 
+        WHEN num_telefone_1 IS NOT NULL AND num_telefone_1 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(num_telefone_1, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN num_telefone_2 IS NOT NULL AND num_telefone_2 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(num_telefone_2, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN num_telefone_3 IS NOT NULL AND num_telefone_3 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(num_telefone_3, '[^0-9]', ''), 1, 2) AS varchar)
+    END AS ddd,
+    COALESCE(
+    CASE WHEN num_telefone_1 IS NOT NULL AND num_telefone_1 != '' THEN REGEXP_REPLACE(SUBSTRING(num_telefone_1 FROM 4), '\\s|-', '') END,
+    CASE WHEN num_telefone_2 IS NOT NULL AND num_telefone_2 != '' THEN REGEXP_REPLACE(SUBSTRING(num_telefone_2 FROM 4), '\\s|-', '') END,
+    CASE WHEN num_telefone_3 IS NOT NULL AND num_telefone_3 != '' THEN REGEXP_REPLACE(SUBSTRING(num_telefone_3 FROM 4), '\\s|-', '') END
+) AS telefone,
+LOWER(ua.email) AS email,
+dt_ultima_edicao as dt_atualizacao,
+'webdental' as sistema_origem
+FROM ua
+WHERE ua.unidade_teste = 'N'
+),
+pes as ( --aqui começa as tabelas da webvidas
+  select
+    id_cliente,
+    tipo_pessoa,
+    cnpj,
+    nome,
+    cpf,
+    data_hora_ultima_edicao,
+    data_efetivacao_cliente,
+    nome_fantasia,
+    telefone,
+    telefone2,
+    celular
+  FROM todos_data_lake_trusted_webvidas.db_pessoa pes
+), 
+ender as ( 
+  select
+    id_cliente,
+    tipo_logradouro,
+    endereco,
+    numero_endereco,
+    endereco_complemento,
+    bairro,
+    cod_cidade,
+    cep,
+    cod_municipio_ans
+  FROM todos_data_lake_trusted_webvidas.db_endereco ender
+), 
+cid as ( 
+  select
+    cod_cidades,
+    estados_cod_estados,
+    nome
+  FROM todos_data_lake_trusted_webvidas.db_cidades cid
+), 
+ope as ( 
+  select
+    id_cliente,
+    id_empresa
+  FROM todos_data_lake_trusted_webvidas.db_operacao_plano ope
+), 
+est as ( 
+  select
+    sigla,
+    cod_estados
+  FROM todos_data_lake_trusted_webvidas.db_estados est
+), 
+units_webvidas as ( ----------------------- webvidas
+SELECT  cast(05983170000157 as varchar) as cnpjfilial,
+	    cast(07001 as varchar) as filial,
+REGEXP_REPLACE((case when pes.tipo_pessoa = 'FISICA' then pes.cpf ELSE pes.cnpj END), '[./-]', '') AS cnpjcliente,
+		pes.nome AS nomecliente,
+		(case when pes.tipo_pessoa = 'FISICA' then 'F' ELSE 'J' END) AS tipo,
+	CASE 
+    WHEN pes.tipo_pessoa = 'FISICA' THEN pes.nome 
+    ELSE COALESCE(pes.nome_fantasia, pes.nome)
+		END AS nomefantasia,
+TRIM(CONCAT(COALESCE(ender.tipo_logradouro, ''), ' ', ender.endereco, ', ', ender.numero_endereco)) AS endereco,
+ender.endereco_complemento AS complemento, 
+ender.bairro,
+ender.bairro, est.sigla AS estado,
+SUBSTRING(CAST(ender.cod_municipio_ans AS VARCHAR) FROM 3 FOR 10) AS codigomunicipio,
+cid.nome AS municipio,
+REPLACE(ender.cep, '-', '') AS cep,
+CASE 
+        WHEN pes.telefone IS NOT NULL AND pes.telefone != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.telefone2 IS NOT NULL AND pes.telefone2 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone2, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.celular IS NOT NULL AND pes.celular != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.celular, '[^0-9]', ''), 1, 2) AS varchar)
+    END AS ddd,
+    REPLACE
+		   (
+				REPLACE
+				(
+					REPLACE
+					(
+						REPLACE
+						(
+							REPLACE
+							(
+								COALESCE(NULLIF(pes.celular, ''), NULLIF(pes.telefone, ''), coalesce(pes.telefone2, '')), '(', ''
+							), ')', ''
+						), '-', ''
+					), ' ', ''
+				), '_', ''
+			) AS telefone,
+pes.data_hora_ultima_edicao as dt_atualizacao,
+'webvidas' as sistema_origem
+FROM pes
+	INNER JOIN ender ON pes.id_cliente = ender.id_cliente
+	LEFT JOIN ope ON pes.id_cliente = ope.id_cliente
+	LEFT JOIN cid ON cid.cod_cidades = ender.cod_cidade
+	LEFT JOIN est ON est.cod_estados = cid.estados_cod_estados
+WHERE (case when pes.tipo_pessoa = 'FISICA' then pes.data_efetivacao_cliente IS NOT NULL ELSE 1 = 1 END)
+AND ope.id_empresa IS null
+),
+u as ( --------- dados do amei
+select 
+*
+from todos_data_lake_trusted_amei.unidades 
+),
+m as (
+select 
+*
+from todos_data_lake_trusted_amei.municipios 
+),
+e as (
+select 
+*
+from todos_data_lake_trusted_amei.estados  
+),
+units_amei as ( ----------------------- AMEI
+SELECT  
+case when u.id = 183 then cast(44905730000107 as varchar) else cast(27602235000100 as varchar)
+	end as cnpjfilial,
+case when u.id = 183 then cast(02001 as varchar) else cast(01001 as varchar)
+	end as filial,
+u.cnpj as cnpjcliente,
+u.razao_social as nomecliente,
+'j' as tipo,
+u.descricao as nome_fantasia,
+u.endereco,
+u.complemento,
+u.bairro,
+e.uf as estado,
+null as codigomunicipio,
+m.municipio as cidade,
+u.cep,
+	COALESCE(
+    CASE WHEN u.telefone_principal IS NOT NULL AND u.telefone_principal != '' THEN REGEXP_REPLACE(SUBSTRING(u.telefone_principal FROM 1 FOR 2), '[^0-9]', '') END,
+    CASE WHEN u.telefone_secundario IS NOT NULL AND u.telefone_secundario != '' THEN REGEXP_REPLACE(SUBSTRING(u.telefone_secundario FROM 1 FOR 2), '[^0-9]', '') END
+) AS ddd,
+COALESCE(
+    CASE WHEN u.telefone_principal IS NOT NULL AND u.telefone_principal != '' THEN REGEXP_REPLACE(SUBSTRING(u.telefone_principal FROM 3), '\\s|-', '') END,
+    CASE WHEN u.telefone_secundario IS NOT NULL AND u.telefone_secundario != '' THEN REGEXP_REPLACE(SUBSTRING(u.telefone_secundario FROM 3), '\\s|-', '') END
+) AS telefone,
+u.email_principal as email,
+u.update_at as dt_atualizacao,
+'Amei!' as sistema_origem
+FROM u
+left join m ON m.id = u.FK_MUNICIPIO 
+left join e on e.id = m.fk_estados
+WHERE u.RAZAO_SOCIAL IS NOT null
+)
+select* from (
+select * from units_feegow
+union all
+select * from units_webdental
+union all
+select * from units_webvidas
+union all
+select * from units_amei
+)
+
+
+
+--modelagem referente ao pedidoincluir
+with m as (
+select
+	id,
+	"data",
+	conta_id,
+	valor_pago,
+	valor,
+	descricao,
+	forma_pagamento_id,
+	tipo_movimentacao,
+	credito_debito
+    from todos_data_lake_trusted_feegow.movimentacao
+),
+ct as (
+select 
+	id,
+	movimentacao_id,
+	parcelas,
+	bandeira_cartao_id,
+	numero_transacao,
+	numero_autorizacao 
+    from todos_data_lake_trusted_feegow.transacao_cartao
+),
+bc as (
+select 
+	id,
+	bandeira 
+    from todos_data_lake_trusted_feegow.bandeiras_cartao
+),
+i as (
+select 
+	recurrence,
+	credito_debito,
+	sys_active,
+	id,
+	conta_id,
+	associacao_conta_id,
+	unidade_id,
+	tabela_particular_id
+    from todos_data_lake_trusted_feegow.contas
+),
+ii as (
+select 
+	id,
+	conta_id,
+	pacote_id,
+	categoria_id,
+	procedimento_id,
+	tipo_item_id,
+	quantidade,
+	valor_unitario,
+	acrescimo,
+	desconto,
+	is_executado,
+	is_cancelado
+    from todos_data_lake_trusted_feegow.conta_itens
+),
+pii as (
+select 
+	id
+    from todos_data_lake_trusted_feegow.pacotes
+),
+movpay as (
+select 
+	id,
+	"data",
+	sys_user 
+    from todos_data_lake_trusted_feegow.movimentacao
+),
+fdpay as (
+select 
+	pagamento_id,
+	parcela_id
+    from todos_data_lake_trusted_feegow.pagamento_associacao
+),
+idesc as (
+select 
+	valor,
+	item_id,
+	pagamento_id
+    from todos_data_lake_trusted_feegow.pagamento_item_associacao
+),
+pacconta as(
+select 
+	cpf,
+	id,
+	nome_paciente
+    from todos_data_lake_trusted_feegow.pacientes
+),
+subcat as (
+select 
+	id,
+	name,
+	category
+    from todos_data_lake_trusted_feegow.planodecontas_receitas
+),
+cat as (
+select 
+	id,
+	name
+    from todos_data_lake_trusted_feegow.planodecontas_receitas
+),
+proc as (
+select 
+	id,
+	nome_procedimento,
+	grupo_procedimento_id,
+	tipo_procedimento_id
+    from todos_data_lake_trusted_feegow.procedimentos
+),
+prod as (
+select 
+	id
+    from todos_data_lake_trusted_feegow.produtos
+),
+procgrup as (
+select 
+	id,
+	sysactive,
+	nomegrupo
+    from todos_data_lake_trusted_feegow.procedimentos_grupos
+),
+unit as (
+select 
+  id, 
+  regiao_id,
+  nome_fantasia,
+  cnpj,
+  nome_unidade,
+  endereco,
+  complemento,
+  cep,
+  numero,
+  bairro,
+  cidade,
+  estado,
+  tel1,
+  tel2,
+  cel1,
+  email1
+    from todos_data_lake_trusted_feegow.unidades
+),
+pag3 as (
+select 
+	id
+    from todos_data_lake_trusted_feegow.pacientes
+),
+pag2 as (
+select 
+	id 
+    from todos_data_lake_trusted_feegow.fornecedores
+),
+pag6 as (
+select 
+	id 
+    from todos_data_lake_trusted_feegow.convenios
+),
+tp as (
+select 
+	id,
+	nome_tabela_particular
+    from todos_data_lake_trusted_feegow.tabelas_particulares
+),
+users as (
+select 
+	id,
+	id_relativo 
+    from todos_data_lake_trusted_feegow.usuarios
+),
+func as (
+select 
+	id
+    from todos_data_lake_trusted_feegow.funcionarios
+),
+ur as (
+select 
+	id,
+	descricao
+    from todos_data_lake_trusted_feegow.unidades_regioes
+),
+final_query as (
+select
+	m."data" as data,
+	m."data" as datavencimento, --alterado nomemclatura
+	movpay."data" as datapagamento, --alterado nomemclatura
+	pacconta.CPF cpfpaciente, --alterado nomemclatura
+  	i.recurrence, 
+  	pacconta.id id_paciente,
+  	pacconta.nome_paciente,
+  	i.credito_debito,
+  	proc.nome_procedimento,
+  	proc.id as id_procedimento,
+    procgrup.nomegrupo,
+    i.sys_active,
+    unit.nome_fantasia,
+    unit.cnpj,
+	 unit.nome_unidade,
+	  unit.endereco,
+	  unit.complemento,
+	  unit.cep,
+	  unit.numero,
+	  unit.bairro,
+	  unit.cidade,
+	  unit.estado,
+	  unit.tel1,
+	  unit.tel2,
+	  unit.cel1,
+	  unit.email1,
+    unit.id as id_unidade,
+    max(ii.quantidade) as quantidade, --não suportou a subquery da antiga contas a receber rodando dentro do redshift -- a funcao max bate com a feegow quando analisado Batatais
+    (CASE 
+        WHEN 'S'='S' THEN (SUM(coalesce(idesc.valor, 0)))/ COALESCE(i.Recurrence, 1) 
+        ELSE coalesce(m.Valor_Pago, 0) 
+    END) Valor_Pago,
+    m.descricao as descricaomovimentacao,
+   (CASE
+	WHEN m.valor - (coalesce(m.valor_pago, 0) + 0.3) <= 0 then 'Quitado' 
+        WHEN m.valor - (coalesce(m.valor_pago, 0) + 0.3) > 0 and coalesce(m.valor_pago, 0) > 0 then 'Parcialmente pago' 
+        ELSE 'Em aberto'
+    END) situacaoconta,
+     (case 
+        when m.forma_pagamento_id IN (8,10) then ct.Parcelas 
+        else 1 
+    end) as parcelas, --alterado nomemclatura
+    cat.name as categoria, --alterado nomemclatura
+    subcat.name as subcategoria,
+    tp.id as id_tabela,
+    tp.nome_tabela_particular,
+    ur.descricao as regional
+        from m
+            LEFT JOIN ct ON ct.movimentacao_id = m.id
+            LEFT JOIN bc ON bc.id = ct.bandeira_cartao_id
+            INNER JOIN i ON i.id = m.conta_id
+            INNER JOIN ii ON ii.conta_id = i.id
+            LEFT JOIN pii ON pii.id = ii.pacote_id
+            LEFT JOIN fdpay ON fdpay.parcela_id = m.id
+            LEFT JOIN movpay ON movpay.id = fdpay.pagamento_id
+            LEFT JOIN idesc ON idesc.item_id = ii.id AND idesc.pagamento_id = movpay.id
+            LEFT JOIN pacconta ON pacconta.id = i.conta_id AND i.associacao_conta_id = 3
+            LEFT JOIN subcat ON subcat.id = ii.categoria_id
+            LEFT JOIN cat ON cat.id = subcat.Category
+            LEFT JOIN proc ON proc.id = ii.procedimento_id AND ii.tipo_item_id = 'S'
+            LEFT JOIN prod ON prod.id = ii.procedimento_id AND ii.tipo_item_id = 'M'
+            LEFT JOIN procgrup ON procgrup.id = proc.grupo_procedimento_id AND procgrup.sysActive = 1
+            LEFT JOIN unit ON unit.id = i.unidade_id
+            LEFT JOIN pag3 ON i.associacao_conta_id = 3 AND i.conta_id = pag3.id
+            LEFT JOIN pag6 ON i.associacao_conta_id = 6 AND i.conta_id = pag6.id
+            LEFT JOIN tp on tp.id = i.tabela_particular_id
+            LEFT JOIN users on movpay.sys_user = users.id
+            LEFT JOIN func on users.id_relativo = func.id			
+            LEFT JOIN ur on ur.id = unit.regiao_id			
+    WHERE
+        m.tipo_movimentacao = 'Bill' 	    
+        AND m.credito_debito = 'C' 	    
+        AND ((ii.is_cancelado <> '1' AND ii.tipo_item_id = 'S') 		
+        OR (ii.tipo_item_id != 'S')) 
+	            AND (i.tabela_particular_id IN (NULL) OR 1=1) 	
+        AND (ii.tipo_item_id IN (NULL) OR 1=1) 	
+        AND (proc.grupo_procedimento_id IN (NULL) OR 1=1) 	    
+        AND (proc.tipo_procedimento_id IN (NULL) OR 1=1) 	    
+        AND ((case when 'N'='S' then ii.pacote_id IS NOT null else true end)) 	    
+        AND         
+        ((CASE         
+            WHEN m.valor - (coalesce(m.valor_pago, 0) + 0.3) <= 0 THEN 'quitado' 			
+            WHEN m.valor - (coalesce(m.valor_pago, 0) + 0.3) > 0  AND coalesce(m.Valor_Pago, 0) > 0 THEN 'parcial' 			
+            ELSE 'aberto'
+        END) in ('quitado', 'parcial') OR 1=0)
+GROUP BY             
+    (case when 'S'='S' then CONCAT(CONCAT(cast(m.id as varchar), ', '), cast(ii.id as varchar)) else cast(m.id as varchar) end),     
+    i.sys_active, 
+    ii.Quantidade,    
+    ii.Valor_Unitario,    
+    ii.Acrescimo,     
+    ii.Desconto,     
+    i.Recurrence,     
+    m.valor,     
+    m.valor_pago,
+    m.data, 
+    unit.nome_fantasia, 
+    unit.id,    
+    unit.nome_unidade,
+    pacconta.CPF,     
+    pacconta.id,     
+    pacconta.nome_paciente,
+    unit.cnpj,
+    unit.endereco,
+	unit.complemento,
+	unit.cep,
+	unit.numero,
+	unit.bairro,
+	unit.cidade,
+	unit.estado,
+	unit.tel1,
+	unit.tel2,
+	unit.cel1,
+	unit.email1,
+    i.credito_debito,    
+    proc.nome_procedimento, 
+    procgrup.nomegrupo,    
+    proc.id,     
+    m.descricao,     
+    m.forma_pagamento_id,     
+    ct.parcelas,     
+    cat.name,     
+    subcat.name,     
+    m.conta_id,	
+    tp.id,     
+    tp.nome_tabela_particular,     
+    ur.descricao,     
+    m.id,     
+    movpay.data
+ORDER BY 
+    m.Data, 
+    m.id   
+), feegow as (
+select 
+	datapagamento,
+	extract (month from datapagamento) as mes_pagamento,
+	extract (year from datapagamento) as ano_pagamento,
+	cast(27602235000100 as varchar) as cnpjfilial, 
+	cast(01001 as varchar) as filial,
+	cnpj, 
+	nome_unidade as nomecliente,
+	'j' as tipo,
+	nome_fantasia as nomefantasia,
+	endereco,
+	complemento,
+	bairro,
+	estado,
+	null as codigomunicipio,
+	cidade as municipio,
+	cep,
+	COALESCE(
+    CASE WHEN tel1 IS NOT NULL AND tel1 != '' THEN REGEXP_REPLACE(SUBSTRING(tel1 FROM 2 FOR 4), '[^0-9]', '') END,
+    CASE WHEN tel2 IS NOT NULL AND tel2 != '' THEN REGEXP_REPLACE(SUBSTRING(tel2 FROM 2 FOR 4), '[^0-9]', '') END,
+    CASE WHEN cel1 IS NOT NULL AND cel1 != '' THEN REGEXP_REPLACE(SUBSTRING(cel1 FROM 2 FOR 4), '[^0-9]', '') END
+) AS ddd,
+COALESCE(
+    CASE WHEN tel1 IS NOT NULL AND tel1 != '' THEN REGEXP_REPLACE(SUBSTRING(tel1 FROM 6), '\\s|-', '') END,
+    CASE WHEN tel2 IS NOT NULL AND tel2 != '' THEN REGEXP_REPLACE(SUBSTRING(tel2 FROM 6), '\\s|-', '') END,
+    CASE WHEN cel1 IS NOT NULL AND cel1 != '' THEN REGEXP_REPLACE(SUBSTRING(cel1 FROM 6), '\\s|-', '') END
+) AS telefone,
+email1 as email,
+nome_procedimento as descricao,
+sum(valor_pago) as valor,
+CONCAT('L', CAST(EXTRACT(MONTH FROM datapagamento) AS VARCHAR), CAST(EXTRACT(YEAR FROM datapagamento) AS VARCHAR)) AS lote
+	from final_query
+	where 1=1
+	--and data = date('2023-01-10') --filtro
+	--and nome_fantasia = 'AmorSaúde Contagem' -- filtro
+group by
+	datapagamento,
+	cnpj, 
+	nome_unidade,
+	nome_fantasia,
+	endereco,
+	complemento,
+	bairro,
+	estado,
+	cidade,
+	cep,
+	tel1,
+    tel2,
+    cel1,
+	email1,
+	nome_procedimento
+	), 
+    --WEBDENTAL
+    fcp as (
+select 
+	*
+    from todos_data_lake_trusted_webdental.tbl_financeiro_clinica_parcelas
+),
+ua as (
+select 
+	*
+    from todos_data_lake_trusted_webdental.tbl_unidade_atendimento
+),
+cpc as (
+select 
+    *
+    from todos_data_lake_trusted_webdental.tbl_categoria_plano_conta
+),
+gf as (
+select 
+	*
+    from todos_data_lake_trusted_webdental.tbl_grupo_financeiro
+),
+	webdental as ( -- aqui começa webdental	
+	SELECT 
+	cast(sub.dt_baixa as date) as datapagamento,
+	extract (month from cast(sub.dt_baixa as date)) AS mes_pagamento,
+	extract (year from cast(sub.dt_baixa as date)) AS ano_pagamento,	
+	cast(27602235000100 AS VARCHAR) AS cnpjfilial,
+	cast(01001 AS VARCHAR) AS filial,
+	REGEXP_REPLACE(sub.cnpj, '[^0-9]', '') AS cnpjcliente,
+	sub.nm_unidade_atendimento AS nomecliente, 
+	'J' AS tipo,	
+		case 
+			when sub.nome_fantasia = '' or sub.nome_fantasia is null 
+				then sub.nm_unidade_atendimento else sub.nome_fantasia 
+				end AS nomefantasia,	
+	(sub.rua || ', '|| sub.numero) AS endereco,
+	sub.complemento, 
+	sub.cd_bairro AS bairro,
+	sub.estado, 
+	null AS codigomunicipio, 
+	sub.cd_cidade AS municipio, 
+	REPLACE(sub.cep, '-', '') AS cep,
+	CASE 
+        WHEN sub.num_telefone_1 IS NOT NULL and sub.num_telefone_1 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(sub.num_telefone_1, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN sub.num_telefone_2 IS NOT NULL AND sub.num_telefone_2 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(sub.num_telefone_2, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN sub.num_telefone_3 IS NOT NULL AND sub.num_telefone_3 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(sub.num_telefone_3, '[^0-9]', ''), 1, 2) AS varchar)
+    END AS ddd,
+	COALESCE(
+   		CASE WHEN sub.num_telefone_1 IS NOT NULL AND sub.num_telefone_1 != '' THEN REGEXP_REPLACE(SUBSTRING(sub.num_telefone_1 FROM 3), '\\s|-', '') END,
+    	CASE WHEN sub.num_telefone_2 IS NOT NULL AND sub.num_telefone_2 != '' THEN REGEXP_REPLACE(SUBSTRING(sub.num_telefone_2 FROM 3), '\\s|-', '') END,
+    	CASE WHEN sub.num_telefone_3 IS NOT NULL AND sub.num_telefone_3 != '' THEN REGEXP_REPLACE(SUBSTRING(sub.num_telefone_3 FROM 3), '\\s|-', '') END
+	) AS telefone,
+	sub.email AS email, 
+	'Base de calculo royalties' AS descricao, 
+	sum(sub.valor_credito) AS valor, 
+	CONCAT('L', CAST(EXTRACT(MONTH FROM cast(sub.dt_baixa as date)) AS VARCHAR), CAST(EXTRACT(YEAR FROM cast(sub.dt_baixa as date)) AS VARCHAR)) AS lote
+FROM
+(
+	SELECT 
+	    ua.chave AS chave_unidade, ua.cnpj, ua.nm_unidade_atendimento, ua.nome_fantasia, ua.rua,
+		 ua.numero, ua.complemento, ua.cd_bairro, ua.estado, ua.cd_cidade, ua.cep, ua.num_telefone_1,
+		 ua.num_telefone_2,  ua.num_telefone_3, ua.email, fcp.chave, fcp.valor_credito, fcp.dt_baixa
+	FROM  fcp
+	    inner join ua on(ua.cd_unidade_atendimento = fcp.cd_filial)
+	    left join cpc on (fcp.plano_contas = cpc.chave) 
+	    left join gf on(gf.chave = cpc.cd_grupo_plano_conta)
+	WHERE 1=1 
+		and (gf.saldoanterior is null or gf.saldoanterior = 'N')  
+	    and (gf.nm_grupo_financeiro is null or (gf.nm_grupo_financeiro not like 'CR Funcionários' 
+	    and gf.nm_grupo_financeiro not like 'CR - Dental Vidas (Repasse GTOs Próprio)' 
+	    and gf.nm_grupo_financeiro not like 'CR - Resgate aplicações'
+	    and gf.nm_grupo_financeiro not like 'DB%' 
+	    and gf.nm_grupo_financeiro not like 'CR - Transação Bancária' 
+	    and gf.nm_grupo_financeiro not like 'CR ADM%' 
+	    and /* gf.nm_grupo_financeiro not like 'CR OP - ERRO%' and */ gf.nm_grupo_financeiro not like 'CR FIN - Emprestimo' 
+	    and gf.nm_grupo_financeiro not like 'CR FIN - Juros%' 
+	    and gf.nm_grupo_financeiro not like 'CR COM - Venda de Imp%'
+	    and gf.nm_grupo_financeiro not like 'USO%' 
+	    and gf.nm_grupo_financeiro not like 'Retirada%' 
+	    and cpc.nm_categoria_plano_conta not like '%Vale de funcion%'))
+	    and 
+	    (
+  (
+    CAST(fcp.dt_vencimento AS DATE) >= DATE('2020-09-01') 
+    AND fcp.tipo_movimento = 'D'
+  ) 
+  OR 
+  (
+    CAST(fcp.dt_baixa AS DATE) >= DATE('2020-09-01') 
+    AND fcp.tipo_movimento = 'C'
+  )
+) 
+	    AND (
+  (
+    CAST(fcp.dt_vencimento AS DATE) <= DATE('2020-09-30') 
+    AND fcp.tipo_movimento = 'D'
+  ) 
+  OR 
+  (
+    CAST(fcp.dt_baixa AS DATE) <= DATE('2020-09-30') 
+    AND fcp.tipo_movimento = 'C'
+  )
+)
+	    and ua.chave IN ('L03300020200917101258' , 'L00200020130130174652')
+	    and cpc.tipo_movimento = 'E'
+		 AND ua.unidade_teste = 'N' 
+	UNION
+	SELECT
+	    ua.chave AS chave_unidade, ua.cnpj, ua.nm_unidade_atendimento, ua.nome_fantasia, ua.rua,
+		 ua.numero, ua.complemento, ua.cd_bairro, ua.estado, ua.cd_cidade, ua.cep, ua.num_telefone_1,
+		 ua.num_telefone_2,  ua.num_telefone_3, ua.email, fcp.chave, fcp.valor_credito, fcp.dt_baixa
+	FROM todos_data_lake_trusted_webdental.tbl_financeiro_clinica_parcelas as fcp
+	    inner join todos_data_lake_trusted_webdental.tbl_unidade_atendimento as ua on(ua.cd_unidade_atendimento = fcp.cd_filial)
+	    left join todos_data_lake_trusted_webdental.tbl_categoria_plano_conta as cpc on (fcp.plano_contas = cpc.chave) 
+	    left join todos_data_lake_trusted_webdental.tbl_grupo_financeiro as gf  on(gf.chave = cpc.cd_grupo_plano_conta)
+	WHERE 1=1 
+		and (gf.saldoanterior is null or gf.saldoanterior = 'N')  
+	   and (gf.nm_grupo_financeiro is null or (gf.nm_grupo_financeiro not like 'CR Funcionários' 
+	   and gf.nm_grupo_financeiro not like 'CR - Dental Vidas (Repasse GTOs Próprio)' 
+	   and gf.nm_grupo_financeiro not like 'CR - Resgate aplicações'
+	   and gf.nm_grupo_financeiro not like 'DB%' 
+	   and gf.nm_grupo_financeiro not like 'CR - Transação Bancária' 
+	   and gf.nm_grupo_financeiro not like 'CR ADM%' 
+	   and gf.nm_grupo_financeiro not like 'CR OP - ERRO%' 
+	   and gf.nm_grupo_financeiro not like 'CR FIN - Juros%' 
+	   and gf.nm_grupo_financeiro not like 'CR COM - Venda de Imp%' 
+	   and gf.nm_grupo_financeiro not like 'CR FIN - Emprestimo' 
+	   and gf.nm_grupo_financeiro not like 'USO%' 
+	   and gf.nm_grupo_financeiro not like 'Retirada%' 
+	   and cpc.nm_categoria_plano_conta not like '%Vale de funcion%'))
+	  AND (
+  (
+    CAST(fcp.dt_vencimento AS DATE) >= DATE '2020-09-01' 
+    AND fcp.tipo_movimento = 'D'
+  ) 
+  OR 
+  (
+    CAST(fcp.dt_baixa AS DATE) >= DATE '2020-09-01' 
+    AND fcp.tipo_movimento = 'C'
+  )
+) 
+	   AND (
+  (
+    CAST(fcp.dt_vencimento AS DATE) <= DATE '2020-09-30' 
+    AND fcp.tipo_movimento = 'D'
+  ) 
+  OR 
+  (
+    CAST(fcp.dt_baixa AS DATE) <= DATE '2020-09-30' 
+    AND fcp.tipo_movimento = 'C'
+  )
+)
+	   and ua.chave IN ('L03300020200917101258' , 'L00200020130130174652')
+	   and fcp.plano_contas =''
+	   AND ua.unidade_teste = 'N'
+) AS sub
+group by 
+sub.chave_unidade, 
+sub.nm_unidade_atendimento,
+sub.cnpj,
+sub.nome_fantasia,
+sub.nm_unidade_atendimento,
+(sub.rua || ', '|| sub.numero),
+sub.complemento, 
+sub.cd_bairro,
+sub.estado, 
+sub.cd_cidade, 
+sub.cep,
+sub.num_telefone_1, sub.num_telefone_2, num_telefone_3,
+sub.email,
+sub.dt_baixa
+),
+    pes as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_pessoa
+),
+  emp as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_pessoa
+),
+doph as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_operacao_plano_historico
+),
+dop as (
+select 
+    *
+    from todos_data_lake_trusted_webvidas.db_operacao_plano
+),
+par as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_parcelas
+),
+uni as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_unidade
+),
+cid as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_cidades
+),
+est as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_estados
+),
+ender as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_endereco
+),
+ende as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_endereco
+),
+u as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_unidade
+),
+fpp as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_financeiro_pj_parcelas
+),
+fpj as (
+select 
+	*
+    from todos_data_lake_trusted_webvidas.db_financeiro_pj
+),
+webvidaspj as ( --aqui começa webvidas PJ
+SELECT 
+cast(par.data_pagamento as date) as datapagamento, --add data de pagamento a pedido da consultoria totvs
+    extract (month from cast(par.data_pagamento as date)) AS mes_pagamento,
+	extract (year from cast(par.data_pagamento as date)) AS ano_pagamento,
+    cast(05983170000157 AS VARCHAR) AS cnpjfilial, --adicionado cnpj filial franqueadora amorsaude nos dados da feegow a pedido do time de projetos
+	cast(07001 AS VARCHAR) AS filial,
+REGEXP_REPLACE(pes.cpf, '[^0-9]', '') AS cnpj,
+pes.nome AS nomecliente, 
+(case when pes.tipo_pessoa = 'FISICA' then 'F' ELSE 'J' END) AS tipo,
+case when pes.tipo_pessoa = 'FISICA' then pes.nome  END AS nomefantasia,
+TRIM(COALESCE(ender.tipo_logradouro || ' ', '') || ender.endereco || ', ' || ender.numero_endereco) AS endereco,
+ender.endereco_complemento AS complemento, 
+ender.bairro, 
+est.sigla AS estado, 
+SUBSTRING(CAST(ender.cod_municipio_ans AS VARCHAR) FROM 3 FOR 10) AS codigomunicipio,
+cid.nome AS municipio, 
+REPLACE(ender.cep, '-', '') AS cep,
+CASE 
+        WHEN pes.telefone IS NOT NULL AND pes.telefone != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.telefone2 IS NOT NULL AND pes.telefone2 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone2, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.celular IS NOT NULL AND pes.celular != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.celular, '[^0-9]', ''), 1, 2) AS varchar)
+    END AS ddd,
+REPLACE
+		   (
+				REPLACE
+				(
+					REPLACE
+					(
+						REPLACE
+						(
+							REPLACE
+							(
+								COALESCE(NULLIF(pes.celular, ''), NULLIF(pes.telefone, ''), coalesce(pes.telefone2, '')), '(', ''
+							), ')', ''
+						), '-', ''
+					), ' ', ''
+				), '_', ''
+			) AS telefone,
+lower(pes.email) AS email,
+'Mensalidade plano odontológico' AS descricao, 
+sum(par.valor_projetado) AS valor, 
+CONCAT('L', CAST(EXTRACT(MONTH FROM cast(par.data_pagamento as date)) AS VARCHAR), CAST(EXTRACT(YEAR FROM cast(par.data_pagamento as date)) AS VARCHAR)) AS lote
+FROM pes
+    INNER JOIN (
+        SELECT id_titular, id_cliente, id_operacao, id_unidade_venda, id_empresa
+        FROM dop
+        UNION 
+		  SELECT id_titular, id_cliente, id_operacao, id_unidade_venda, id_empresa
+        FROM doph
+    ) ope ON pes.id_cliente = ope.id_cliente
+    INNER JOIN par ON ope.id_operacao = par.id_operacao
+    INNER JOIN ender ON ender.id_cliente = pes.id_cliente
+    INNER JOIN uni ON uni.id_unidade = ope.id_unidade_venda
+    LEFT JOIN cid ON cid.cod_cidades = ender.cod_cidade
+    LEFT JOIN est ON est.cod_estados = cid.estados_cod_estados
+WHERE
+    	(
+		 	(par.data_vencimento_parcela BETWEEN '2023-09-01' AND '2023-09-30' AND (par.data_pagamento IS NULL OR par.data_pagamento >= '2023-09-01'))
+         or
+			(par.data_vencimento_parcela > '2023-09-30' AND par.data_pagamento BETWEEN '2023-09-01' AND '2023-09-30')
+		)
+    AND par.parcela_cancelada = 0
+    AND (ope.id_empresa IS NULL OR ope.id_empresa = 0)
+    AND par.valor_projetado > 0
+    AND pes.data_efetivacao_cliente IS NOT NULL
+    AND uni.unidade_teste = 0
+GROUP BY 
+par.data_pagamento,
+ope.id_titular, 
+pes.id_cliente, 
+pes.cpf,
+pes.tipo_pessoa,
+pes.cnpj,
+pes.nome,
+TRIM(COALESCE(ender.tipo_logradouro || ' ', '') || ender.endereco || ', ' || ender.numero_endereco),
+ender.endereco_complemento, 
+ender.bairro, 
+est.sigla, 
+ender.cod_municipio_ans,
+CASE 
+        WHEN pes.telefone IS NOT NULL AND pes.telefone != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.telefone2 IS NOT NULL AND pes.telefone2 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone2, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.celular IS NOT NULL AND pes.celular != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.celular, '[^0-9]', ''), 1, 2) AS varchar)
+    end,
+cid.nome, 
+ender.cep,
+REPLACE
+		   (
+				REPLACE
+				(
+					REPLACE
+					(
+						REPLACE
+						(
+							REPLACE
+							(
+								COALESCE(NULLIF(pes.celular, ''), NULLIF(pes.telefone, ''), coalesce(pes.telefone2, '')), '(', ''
+							), ')', ''
+						), '-', ''
+					), ' ', ''
+				), '_', ''
+			),
+pes.email
+),
+webvidaspf as ( -- aqui começa webvidas PF
+--# Faturamento PF
+SELECT   
+cast(fpj.data_pagamento as date) as datapagamento, --add data de pagamento a pedido da consultoria totvs
+extract (month from cast(fpj.data_pagamento as date)) AS mes_pagamento,
+extract (year from cast(fpj.data_pagamento as date)) AS ano_pagamento,
+cast(05983170000157 AS VARCHAR) AS cnpjfilial, --adicionado cnpj filial franqueadora amorsaude nos dados da feegow a pedido do time de projetos
+cast(07001 AS VARCHAR) AS filial,
+REGEXP_REPLACE(emp.cnpj, '[^0-9]', '') AS cnpj,
+pes.nome AS nomecliente, 
+'J' AS tipo,
+COALESCE(pes.nome_fantasia, pes.nome) AS nomefantasia,
+TRIM(COALESCE(ender.tipo_logradouro || ' ', '') || ender.endereco || ', ' || ender.numero_endereco) as endereco,
+ender.endereco_complemento AS complemento, 
+ender.bairro, 
+est.sigla AS estado, 
+SUBSTRING(CAST(ender.cod_municipio_ans AS VARCHAR) FROM 3 FOR 10) AS codigomunicipio,
+cid.nome AS municipio, 
+REPLACE(ender.cep, '-', '') AS cep,
+CASE 
+        WHEN pes.telefone IS NOT NULL AND pes.telefone != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.telefone2 IS NOT NULL AND pes.telefone2 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone2, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.celular IS NOT NULL AND pes.celular != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.celular, '[^0-9]', ''), 1, 2) AS varchar)
+    END AS ddd,
+		   REPLACE
+		   (
+				REPLACE
+				(
+					REPLACE
+					(
+						REPLACE
+						(
+							REPLACE
+							(
+								COALESCE(NULLIF(pes.celular, ''), NULLIF(pes.telefone, ''), coalesce(pes.telefone2, '')), '(', ''
+							), ')', ''
+						), '-', ''
+					), ' ', ''
+				), '_', ''
+			) AS telefone,
+lower(pes.email) AS email,
+'Mensalidade plano odontológico empresa' AS descricao, 
+sum(fpj.valor_pagar) AS valor, 
+CONCAT('L', CAST(EXTRACT(MONTH FROM cast(fpj.data_pagamento as date)) AS VARCHAR), CAST(EXTRACT(YEAR FROM cast(fpj.data_pagamento as date)) AS VARCHAR)) AS lote
+from par
+    INNER JOIN
+	 (
+        select id_operacao, id_cliente, id_unidade_venda, id_empresa
+        from dop
+        union
+        select id_operacao, id_cliente, id_unidade_venda, id_empresa
+        from doph
+    ) ope ON par.id_operacao = ope.id_operacao 
+    INNER JOIN pes on pes.id_cliente = ope.id_cliente
+    INNER JOIN u on u.id_unidade = ope.id_unidade_venda
+    INNER JOIN emp on ope.id_empresa = emp.id_cliente
+    INNER JOIN ender ON emp.id_cliente = ender.id_cliente
+    INNER JOIN fpp on fpp.id_operacao = par.id_operacao and fpp.num_parcela = par.num_parcela
+    INNER JOIN fpj on fpj.id = fpp.id_financeiro_pj
+    INNER JOIN ende ON ende.id_cliente = emp.id_cliente
+    LEFT JOIN cid ON ende.cod_cidade = cid.cod_cidades
+    LEFT JOIN est ON est.cod_estados = cid.estados_cod_estados
+where par.parcela_cancelada = 0
+	and u.unidade_teste = 0
+	and extract(month from cast(fpj.data_vencimento as date)) = 9
+	and extract (year from cast(fpj.data_vencimento as date)) = 2023
+GROUP BY emp.id_cliente,
+emp.cnpj,
+fpj.data_pagamento,
+pes.nome,
+COALESCE(pes.nome_fantasia, pes.nome),
+TRIM(COALESCE(ender.tipo_logradouro || ' ', '') || ender.endereco || ', ' || ender.numero_endereco),
+SUBSTRING(CAST(ender.cod_municipio_ans AS VARCHAR) FROM 3 FOR 10),
+ender.endereco_complemento, 
+ender.bairro, 
+est.sigla,
+cid.nome, 
+REPLACE(ender.cep, '-', ''),
+CASE 
+        WHEN pes.telefone IS NOT NULL AND pes.telefone != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.telefone2 IS NOT NULL AND pes.telefone2 != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.telefone2, '[^0-9]', ''), 1, 2) AS varchar)
+        WHEN pes.celular IS NOT NULL AND pes.celular != '' 
+            THEN CAST(SUBSTRING(REGEXP_REPLACE(pes.celular, '[^0-9]', ''), 1, 2) AS varchar)
+    end,
+ REPLACE
+		   (
+				REPLACE
+				(
+					REPLACE
+					(
+						REPLACE
+						(
+							REPLACE
+							(
+								COALESCE(NULLIF(pes.celular, ''), NULLIF(pes.telefone, ''), coalesce(pes.telefone2, '')), '(', ''
+							), ')', ''
+						), '-', ''
+					), ' ', ''
+				), '_', ''
+			),
+lower(pes.email)
+)
+select * from (
+select * from feegow
+union all
+select * from webdental
+union all
+select * from webvidaspj
+union all
+select * from webvidaspf
+) limit 100
+
+
+
+--MODELAGEM_FL_SPLIT
+with m as (
+select 
+  *
+  from todos_data_lake_trusted_feegow.movimentacao
+),
+s as (
+select 
+  *
+  from todos_data_lake_trusted_feegow.splits
+),
+u as (
+select 
+  *
+  from todos_data_lake_trusted_feegow.unidades
+),
+tef as (
+select 
+  *
+  from todos_data_lake_trusted_feegow.tef_autorizacao
+),
+fp as (
+select 
+  *
+  from todos_data_lake_trusted_feegow.formas_pagamento
+), teste as (
+select 
+s."data", 
+sum(m.valor) as valor_conta, round(sum(s.valor/100),2) as valor_split, 
+u.id as unidade_id, u.nome_fantasia , 
+fp.forma_pagamento, tef.sellerid 
+from m
+--left join todos_data_lake_trusted_feegow.contas i on i.id = m.conta_id 
+inner join s on s.movimentacao_id = m.id 
+left join u on u.id = m.unidade_id
+left join tef on tef.unidadeid = u.id 
+left join fp on fp.id = m.forma_pagamento_id 
+--left join todos_data_lake_trusted_feegow.microtef_logs ml on ml.conta_id = i.id
+--left join pdgt_maistodos_adquirencia.fl_transacao t on t.id_transacao = ml.administrativecode
+--left join todos_data_lake_trusted_feegow.split_recebedores sr on sr.split_code = s.split_key
+--left join pdgt_maistodos_adquirencia.fl_transacao at on at.id_seller = tef.sellerid 
+where 1 = 1
+and s.isroyalties = 1
+--and s.id is not null
+--and m.id = 158538273
+and u.id in (19457,19823,19485,19366,19812,19803,19624,19918,19848,
+19670,19811,19329,19308,19850,19649,19304,19272,19457,19350,19610,19516,19409,
+19431,19771,19827,19294,19292, 19669, 19932, 19615, 19820)
+and cast(s."data" as date) between date('2024-01-01') and date('2024-01-18')
+--and s.split_key = 'bf94a7d4c63f40ab8ebc655844330260'
+group by u.id, u.nome_fantasia , 
+fp.forma_pagamento, 
+tef.sellerid , s."data"
+order by s."data" 
+)
+select sum(valor_conta), sum(valor_split) 
+from teste
+where unidade_id = 19329
+
+
+select sum(valor_conta), sum(valor_split)  
+from pdgt_sandbox_gabrielguilherme.fl_split_vmk 
+where unidade_id = 19329
+and "data" between date('2024-01-01') and date('2024-01-18')
+
+
+
+select t.dt_transacao, 
+sum(t.vlr_venda_liquida) vlr_venda_liquida,
+sum(t.vlr_bruto_receber) vlr_bruto_receber, 
+sum(t.vlr_receber) vlr_receber
+from pdgt_maistodos_adquirencia.fl_transacao t
+where 1=1
+--and t.id_transacao  = 'e3d6ae7f055248a69a7afef62f44f429'
+and t.id_seller = '33eac67255da4c1f93f48331c8e84ac5'
+and cast(t.dt_transacao as date) between date('2024-01-01') and date('2024-01-18')
+and t.flag_status = 1
+group by t.dt_transacao 
+limit 100
+
+select * from pdgt_maistodos_adquirencia.fl_transacao a
+limit 100
+
+select * from pdgt_amorsaude_projetos.fl_clienteincluir 
+limit 10
+
+--modelagem receita bruta com royalties e splits
+with receitabruta as (
+select round(sum(x.TotalRecebido), 2) as "Total_Recebido", round(sum(x.TotalRoyalties), 2) as "Total_Royalties", Data, id_unidade from (
+SELECT
+	t.Data "Data",
+	und.Nome_Fantasia,
+	und.id as id_unidade,
+	t.SellerID,
+	reg.descricao Regiao, 
+        --CASE WHEN t.PagTODOS THEN 'Sim' ELSE 'Não' END PagTodos, 
+        ROUND(SUM(t.ValorFinal), 2) TotalRecebido, 
+        ROUND(SUM(t.ValorFinal * 0.04), 2) TotalRoyalties,
+	t.FormaPagto FormaPagamento,
+	t.Tipo,
+	t.Unidade_ID,
+	forma_pagamento_id FormaPagamentoID,
+	forma_pagamento,
+	und.CNPJ
+FROM
+((
+	SELECT CONCAT('PART', cast(mov.id as varchar)) id, idesc.Valor ValorFinal, mov.Data DATA, (case when ca.Integracao_SPLIT = 'S' then 1 else 0 end) PagTODOS, tef.SellerID, mov.Unidade_ID, fpm.forma_pagamento FormaPagto, 'Particular' Tipo, mov.forma_pagamento_id, ii.Desconto, ii.Quantidade * (ii.Valor_Unitario) ValorSemDesconto
+	FROM
+			todos_data_lake_trusted_feegow.movimentacao mov
+	LEFT JOIN todos_data_lake_trusted_feegow.pagamento_item_associacao idesc ON idesc.pagamento_id = mov.id
+	LEFT JOIN todos_data_lake_trusted_feegow.conta_itens ii ON ii.id = idesc.Item_ID
+	LEFT JOIN todos_data_lake_trusted_feegow.devolucoes_itens devit ON devit.conta_itens_id = ii.id
+	LEFT JOIN todos_data_lake_trusted_feegow.devolucoes dev ON dev.id = devit.devolucoes_ID
+	INNER JOIN todos_data_lake_trusted_feegow.formas_pagamento fpm ON mov.forma_pagamento_id = fpm.id
+	LEFT JOIN todos_data_lake_trusted_feegow.tef_autorizacao tef ON tef.UnidadeID = mov.Unidade_ID
+	LEFT JOIN todos_data_lake_trusted_feegow.contas_correntes ca ON ca.id = mov.conta_id_debito
+	WHERE
+			mov.Data BETWEEN date('2022-01-01') AND current_date AND mov.tipo_movimentacao <> 'Bill' AND mov.credito_debito = 'D' AND mov.associacao_conta_id_credito = 3
+	GROUP BY
+        idesc.id, mov.id, idesc.Valor, mov.data, ca.Integracao_SPLIT, tef.SellerID, mov.Unidade_ID, fpm.forma_pagamento, mov.forma_pagamento_id, ii.Desconto, ii.Quantidade, ii.Valor_Unitario
+) 
+UNION ALL 
+(
+	SELECT CONCAT('GCONS', cast(gc.id as varchar)) id, gc.ValorProcedimento ValorFinal, gc.DataAtendimento "Data", 0 PagTODOS, tef.SellerID, gc.UnidadeID, 'Guia Consulta' FormaPagto, 'Convênio' Tipo, 21 PaymentMethodID, 0 Desconto, 0 ValorSemDesconto
+	FROM
+		todos_data_lake_trusted_feegow.tiss_guia_consulta gc
+	LEFT JOIN todos_data_lake_trusted_feegow.tef_autorizacao tef ON tef.UnidadeID = gc.UnidadeID
+	WHERE DATE(gc.DataAtendimento) BETWEEN date('2022-01-01') AND current_date AND gc.sysActive = 1 AND (gc.GuiaStatus <> 4 OR gc.GuiaStatus IS null)
+	GROUP BY
+        gc.id, gc.ValorProcedimento, gc.DataAtendimento, gc.DataAtendimento, tef.SellerID, gc.UnidadeID
+) 
+UNION ALL 
+(
+	SELECT CONCAT('GSADT', cast(igs.id as varchar)) id, igs.ValorTotal ValorFinal, igs.Data, 0 PagTODOS, tef.SellerID, gs.UnidadeID, 'Guia SADT' FormaPagto, 'Convênio' Tipo, 22 PaymentMethodID, 0 Desconto, 0 ValorSemDesconto
+	FROM
+	todos_data_lake_trusted_feegow.tiss_procedimentos_sadt igs
+	INNER JOIN todos_data_lake_trusted_feegow.tiss_guia_sadt gs ON gs.id = igs.GuiaID
+	LEFT JOIN todos_data_lake_trusted_feegow.tef_autorizacao tef ON tef.UnidadeID = gs.UnidadeID
+	WHERE DATE(igs.Data) BETWEEN date('2022-01-01') AND current_date AND gs.sysActive = 1 AND (gs.GuiaStatus <> 4 OR gs.GuiaStatus IS NULL)
+	GROUP BY
+        igs.id, igs.ValorTotal, igs.Data, tef.SellerID, gs.UnidadeID
+) 
+UNION ALL 
+(
+	SELECT CONCAT('DEV', cast(dev.id as varchar)) id, - dev.totalDevolucao ValorFinal, DATE(dev.sysDate), 0 PagTODOS, tef.SellerID, inv.unidade_id, 'Devolução' FormaPagto, 'Cancelamento' Tipo, 0 PaymentMethodID, 0 Desconto, 0 ValorSemDesconto
+	FROM
+	todos_data_lake_trusted_feegow.devolucoes dev
+	INNER JOIN todos_data_lake_trusted_feegow.contas inv ON inv.id = dev.InvoiceID
+	LEFT JOIN todos_data_lake_trusted_feegow.tef_autorizacao tef ON tef.UnidadeID = inv.unidade_id
+	WHERE DATE(dev.sysDate) BETWEEN date('2022-01-01') AND current_date AND tipoOperacao = 1
+	GROUP BY
+	dev.id, dev.totalDevolucao, dev.sysDate, tef.SellerID, inv.unidade_id
+) 
+UNION ALL 
+(
+	SELECT CONCAT('REMOV', cast(movrem.id as varchar)) id, movrem.Valor ValorFinal, movrem.Data DATA, 0 PagTODOS, tef.SellerID, movrem.Unidade_ID, fpm.forma_pagamento FormaPagto, 'Particular' Tipo, movrem.forma_pagamento_id, 0 Desconto, 0 ValorSemDesconto
+	FROM
+	todos_data_lake_trusted_feegow.movimentacao_removidos movrem
+	INNER JOIN todos_data_lake_trusted_feegow.formas_pagamento fpm ON movrem.forma_pagamento_id = fpm.id
+	LEFT JOIN todos_data_lake_trusted_feegow.tef_autorizacao tef ON tef.UnidadeID = movrem.Unidade_ID
+	WHERE DATE(movrem.Data) BETWEEN date('2022-01-01') AND current_date AND DATE(movrem.Data) <> DATE(movrem.Data_Remocao) AND movrem.tipo_movimentacao <> 'Bill' AND movrem.credito_debito = 'D' AND movrem.associacao_conta_id_credito = 3
+) 
+UNION ALL 
+(
+	SELECT CONCAT('XPAG', cast(movrem.id as varchar)) id, - movrem.Valor ValorFinal, DATE(movrem.Data_Remocao) DATA, 0 PagTODOS, tef.SellerID, movrem.Unidade_ID, 'Pagamento anulado' FormaPagto, 'Cancelamento' Tipo, movrem.forma_pagamento_id, 0 Desconto, 0 ValorSemDesconto
+	FROM
+	todos_data_lake_trusted_feegow.movimentacao_removidos movrem
+	LEFT JOIN todos_data_lake_trusted_feegow.tef_autorizacao tef ON tef.UnidadeID = movrem.Unidade_ID
+	WHERE DATE(movrem.Data_Remocao) BETWEEN date('2022-01-01') AND current_date AND DATE(movrem.Data) <> DATE(movrem.Data_Remocao) AND movrem.tipo_movimentacao <> 'Bill' AND movrem.credito_debito = 'D' AND movrem.associacao_conta_id_credito = 3
+) 
+UNION ALL 
+(
+	SELECT CONCAT('PEXT', cast(mov.id as varchar)) id, ii.Valor_Custo_Calculado ValorFinal, mov.Data DATA, 0 PagTODOS, tef.SellerID, mov.Unidade_ID, 'Pagto. Externo' FormaPagto, 'Pagto. Parcial' Tipo, 20 PaymentMethodID, 0 Desconto, 0 ValorSemDesconto
+	FROM
+	todos_data_lake_trusted_feegow.movimentacao mov
+	LEFT JOIN todos_data_lake_trusted_feegow.pagamento_item_associacao idesc ON idesc.Pagamento_ID = mov.id
+	LEFT JOIN todos_data_lake_trusted_feegow.conta_itens ii ON ii.id = idesc.Item_ID
+	INNER JOIN todos_data_lake_trusted_feegow.formas_pagamento fpm ON mov.forma_pagamento_id = fpm.id
+	LEFT JOIN todos_data_lake_trusted_feegow.tef_autorizacao tef ON tef.UnidadeID = mov.Unidade_ID
+	LEFT JOIN todos_data_lake_trusted_feegow.contas_correntes ca ON ca.id = mov.conta_id_debito
+	LEFT JOIN todos_data_lake_trusted_feegow.fornecedores forn ON forn.id = ii.executante_id AND ii.executante_associacao_id = 2
+	INNER JOIN todos_data_lake_trusted_feegow.recebimentoparcial_fornecedores_unidades rfu ON forn.id = rfu.fornecedorid
+	WHERE
+	mov.Data BETWEEN date('2022-01-01') and current_date  AND mov.tipo_movimentacao <> 'Bill' AND mov.credito_debito = 'D' AND mov.associacao_conta_id_credito = 3 AND ii.Valor_Custo_Calculado > 0 AND forn.RecebeParcial = 1 
+	GROUP BY
+	idesc.id, mov.id, ii.Valor_Custo_Calculado,  mov.Data, tef.SellerID, mov.Unidade_ID
+)) t
+INNER JOIN todos_data_lake_trusted_feegow.unidades und ON und.id = t.Unidade_ID
+LEFT JOIN todos_data_lake_trusted_feegow.unidades_regioes reg ON reg.id = und.regiao_id
+LEFT JOIN todos_data_lake_trusted_feegow.formas_pagamento ON todos_data_lake_trusted_feegow.formas_pagamento.id = t.forma_pagamento_id
+INNER JOIN (
+	SELECT 'Convênio' tipo, 2 id UNION ALL
+	SELECT 'Cancelamento' tipo, 3 id UNION ALL
+	SELECT 'Particular' tipo, 4 id UNION ALL
+	SELECT 'Pagto. Parcial' tipo, 5 id 
+) AS tp ON t.tipo = tp.tipo
+ --AND if('[Tipo]'=0, TRUE,tp.id = '[Tipo]') AND if('[PaymentMethod]'=0, TRUE,t.PaymentMethodID = '[PaymentMethod]')
+GROUP by
+	und.id,
+	t.data,
+	t.Unidade_ID,
+	t.FormaPagto,
+	t.Data,
+	und.Nome_Fantasia,
+	t.SellerID,
+	reg.descricao,
+	t.Tipo,
+	forma_pagamento_id,
+	forma_pagamento,
+	und.CNPJ
+ORDER BY
+	t.Data,
+	t.Unidade_ID,
+	t.FormaPagto ) x group by x.id_unidade, x.data),
+	royalties as (
+	select 
+	ry.datareferencia as data, 
+	u.id as id_unidade,
+	sum(ry.valortotalvendas) as TotalRoyalties,
+	sum(ry.valorsplittotal) as ValorSplitado, 
+	sum(ry.valortotalvendas) - sum(ry.valorsplittotal) as APagar, 
+	ry.status as Status 
+	from todos_data_lake_trusted_feegow.royalties_contas ry
+left join todos_data_lake_trusted_feegow.unidades u on ry.unidadeid = u.id
+left join todos_data_lake_trusted_feegow.unidades_regioes ur on u.regiao_id = ur.id
+group by ry.datareferencia, u.id, ry.status)
+select royalties.data as data_transacao, royalties.id_unidade, receitabruta.total_recebido as receitabruta, receitabruta.total_royalties as 
+royalties, royalties.valorsplitado,
+royalties.apagar as boletos, 
+royalties.status from royalties
+left join receitabruta on royalties.id_unidade = receitabruta.id_unidade and receitabruta.data = royalties.data
+where receitabruta.id_unidade is not null 
+and royalties.id_unidade = 19329
+and royalties.data between date('2024-01-01') and date('2024-01-18')
+
+
+
+
+
+--MODELAGEM FL_FL_TRANSACAO TITULOINCLUIR
+select * from todos_data_lake_trusted_feegow.unidades 
+where nome_fantasia  in ('AmorSaúde Ribeirão Preto', 'AmorSaúde Araraquara')
+limit 10
+
+select count(*), r.sistema_origem 
+from pdgt_amorsaude_projetos.fl_clienteincluir r
+group by r.sistema_origem
+
+select * from pdgt_maistodos_adquirencia.fl_transacao 
+where status_transacao = 'succeeded'
+--and id_transacao = 'e13863cebfc148bba1a234d84b7f655c'
+order by dt_transacao desc
+
+
+select * from todos_data_lake_trusted_feegow.microtef_logs l
+inner join pdgt_maistodos_adquirencia.fl_transacao t on t.id_transacao = l.administrativecode 
+--left join todos_data_lake_trusted_feegow.movimentacao m on m.id = l.movimento_id 
+--left join todos_data_lake_trusted_feegow.contas i on i.id = m.conta_id 
+--left join todos_data_lake_trusted_feegow.conta_itens ii on ii.conta_id = i.id
+--left join todos_data_lake_trusted_feegow.procedimentos p on p.id = ii.procedimento_id 
+where t.id_seller = '086885024f8d4c1b9a3daaf4c2f6b6a7'
+and t.id_transacao = 'c6d2a0f4a26c443da223ba98576a8c62'

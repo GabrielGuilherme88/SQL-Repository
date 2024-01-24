@@ -597,3 +597,220 @@ s.valor
 --where id = 'PART152246076'
 --group by data
 --order by data
+
+
+
+select sum(quantidade) as quantidade , sum(valor_pago) as valorpago, count(*)
+from (
+select
+datapagamento,
+id_unidade,
+id_tabela,
+id_funcionario,
+id_procedimento,
+nome_procedimento,
+quantidade,
+sum(valor_pago) as valor_pago,
+case
+	when nomegrupo <> '' then nomegrupo
+	when categoria <> '' then categoria
+	else subcategoria
+end as conta_contabil,
+situacaoconta
+from pdgt_amorsaude_financeiro.fl_contas_a_receber v
+where 1 = 1
+and v.datapagamento between date('2024-01-01') and date('2024-01-08') --aqui vocês podem alterar para validação
+and v.id_unidade = 19680 --aqui vocês podem alterar para validação
+--and nomegrupo in ('Exames Laboratoriais', 'Exames de Imagem', 'Procedimentos', 'Sessão', 'Cirurgia geral', 'Cirurgia Oftalmológica', 'Vacinas',' Terapias Injetaveis')
+--and nome_paciente = 'Iraci Praisler Palota'
+group by 
+case
+	when nomegrupo <> '' then nomegrupo
+	when categoria <> '' then categoria
+	else subcategoria
+	end,
+data,
+datavencimento,
+datapagamento,
+cpfpaciente,
+recurrence,
+id_paciente,
+nome_paciente,
+id_procedimento,
+nome_procedimento,
+nomegrupo,
+tipoprocedimento,
+--forma_pagamento,
+sys_active,
+id_funcionario,
+nome_unidade,
+id_unidade,
+descricaomovimentacao,
+situacaoconta,
+parcelas,
+categoria,
+subcategoria,
+id_tabela,
+nome_tabela_particular,
+id_regional,
+regional,
+--id_pofissional,
+id_fornecedor,
+quantidade
+)
+
+
+SELECT
+    id_unidade,
+    datapagamento,
+    id_tabela,
+    id_funcionario,
+    id_procedimento,
+    CASE 
+        WHEN nomegrupo <> '' THEN nomegrupo 
+        WHEN categoria_alias <> '' THEN categoria_alias
+        ELSE subcategoria 
+    END AS conta_contabil,
+    situacaoconta,
+    SUM(valor_pago) as valor_pago,
+    SUM(qtde_real) AS soma_qtde_real_por_clinica
+FROM (
+    SELECT
+        id_unidade,
+        moviid,
+        CAST(datapagamento AS TIMESTAMP) AS datapagamento,
+        id_procedimento,
+        forma_pagamento,
+        situacaoconta,
+        id_funcionario,
+        nomegrupo,
+        categoria AS categoria_alias, -- Renamed here to avoid ambiguity
+        subcategoria,
+        id_tabela,
+        SUM(quantidade) OVER (PARTITION BY moviid, datapagamento, id_paciente, id_procedimento, COUNT(DISTINCT forma_pagamento) = 1) AS total_quantidade,
+        (SUM(quantidade) / SUM(quantidade) OVER (PARTITION BY moviid, id_paciente, id_procedimento, COUNT(DISTINCT forma_pagamento) = 1)) AS qtde_real,
+        valor_pago
+    FROM pdgt_amorsaude_financeiro.fl_contas_a_receber
+    WHERE 1 = 1
+        AND datapagamento BETWEEN DATE('2024-01-01') AND DATE('2024-01-09')
+    GROUP BY
+        id_unidade,
+        moviid,
+        datapagamento,
+        id_funcionario,
+        id_procedimento,
+        forma_pagamento,
+        quantidade,
+        id_paciente,
+        nomegrupo,
+        categoria,
+        subcategoria,
+        id_tabela,
+        situacaoconta,
+        valor_pago
+) AS subquery
+where id_unidade = 19680
+and datapagamento between date('2024-01-01') and date('2024-01-08')
+GROUP BY
+    id_unidade,
+    datapagamento,
+    id_tabela,
+    CASE 
+        WHEN nomegrupo <> '' THEN nomegrupo 
+        WHEN categoria_alias <> '' THEN categoria_alias 
+        ELSE subcategoria 
+    END,
+    id_funcionario,
+    id_procedimento,
+    situacaoconta
+ORDER BY id_unidade;
+
+
+--modelagem_IMPORTAÇÃO_DE_PROCEDIMENTOS
+SELECT
+  "public"."stg_procedimentos_tabelas_precos"."id" AS "id",
+  "public"."stg_procedimentos_tabelas_precos"."nometabela" AS "nometabela",
+  "Stg Procedimentos"."id" AS "Stg Procedimentos__id",
+  "Stg Procedimentos"."nome_procedimento" AS "Stg Procedimentos__nome_procedimento",
+  "Stg Unidades"."id" AS "Stg Unidades__id",
+  "Stg Unidades"."nome_fantasia" AS "Stg Unidades__nome_fantasia"
+FROM
+  "public"."stprocedimentos_tabelas_precos"
+ 
+LEFT JOIN "public"."stg_procedimentos_tabelas_precos_unidades" AS "Stg Procedimentos Tabelas Precos Unidades" ON "public"."stg_procedimentos_tabelas_precos"."id" = "Stg Procedimentos Tabelas Precos Unidades"."procedimento_tabela_preco_id"
+  LEFT JOIN "public"."stg_procedimentos_tabelas_precos_valores" AS "Stg Procedimentos Tabelas Precos Valores" ON "public"."stg_procedimentos_tabelas_precos"."id" = "Stg Procedimentos Tabelas Precos Valores"."tabelaid"
+  LEFT JOIN "public"."stg_procedimentos" AS "Stg Procedimentos" ON "Stg Procedimentos Tabelas Precos Valores"."procedimentoid" = "Stg Procedimentos"."id"
+  LEFT JOIN "public"."stg_unidades" AS "Stg Unidades" ON "Stg Procedimentos Tabelas Precos Unidades"."unidade_id" = "Stg Unidades"."id"
+WHERE
+  (
+    (
+      "public"."stg_procedimentos_tabelas_precos"."nometabela" = 'Exames Laboratoriais (Cartão de TODOS) - 01/01/23'
+    )
+   
+    OR (
+      "public"."stg_procedimentos_tabelas_precos"."nometabela" = 'DB Medicina Diagnóstica (Cartão de Todos)'
+    )
+    OR (
+      "public"."stg_procedimentos_tabelas_precos"."nometabela" = 'Cartão de TODOS (C) - 01/01/23'
+    )
+  )
+ 
+   AND ("Stg Procedimentos"."ativo" = 'on')
+  AND ("Stg Unidades"."nome_fantasia" = 'AmorSaúde Moju')
+ORDER BY
+  "public"."stg_procedimentos_tabelas_precos"."nometabela" DESC
+
+ ---------------------------------------------------------------
+  
+  select * from todos_data_lake_trusted_feegow.form_9872_amostra 
+  where nome_paciente  = 'Aldo Bentes Vieira'
+  limit 100
+  
+  select * from todos_data_lake_trusted_feegow.profissionais 
+  where id = 512036
+  
+ select * from pdgt_amorsaude_projetos.fl_clienteincluir 
+ limit 10
+  
+select * from pdgt_amorsaude_financeiro.fl_contas_a_pagar_presidente 
+where subcategoria is not null and categoria is not null 
+and datapagamento = date('2021-10-21')
+and nm_unidade = 'AmorSaúde Amparo'
+
+
+
+select count(*), sum(v.valor_pago), sum(v.quantidade), sum(v.recurrence) 
+from pdgt_amorsaude_financeiro.fl_contas_a_receber v
+where v.datapagamento between date('2023-12-01') and date('2023-12-30') --aqui vocês podem alterar para validação
+and v.id_unidade = 19957--19680 --aqui vocês podem alterar para validação
+
+
+select v.datapagamento, snap ,sum(valor_pago)
+from pdgt_sandbox_gabrielguilherme.fl_contas_a_receber_view v
+where v.datapagamento between date('2023-12-01') and date('2023-12-31')
+group by v.datapagamento, v.snap
+order by v.datapagamento desc
+
+
+select sum(c.valor_pago), c.datapagamento , c.snap, c.dbt_time 
+from pdgt_amorsaude_financeiro.fl_contas_a_receber_frozen_copy c
+where c.datapagamento between date('2023-11-01') and date('2023-12-31')
+group by c.datapagamento , c.snap, c.dbt_time
+order by c.datapagamento desc
+
+
+select sum(c.valor_pago), c.datapagamento
+from pdgt_amorsaude_financeiro.fl_contas_a_receber c
+where c.datapagamento between date('2023-12-01') and date('2023-12-31')
+group by c.datapagamento
+order by c.datapagamento desc
+
+
+select sum(c.valor_pago), c.dbt_time 
+from pdgt_amorsaude_financeiro.fl_contas_a_receber_frozen_copy c
+where c.datapagamento between date('2023-11-01') and date('2023-12-31')
+group by c.dbt_time
+
+select count(*), m.descricao 
+from todos_data_lake_trusted_feegow.movimentacao m
+group by m.descricao 

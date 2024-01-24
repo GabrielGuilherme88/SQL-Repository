@@ -34,7 +34,7 @@ group by tca.nome_status
 
 
 --modelagem
-select count(distinct ag.id) --countar distinto os id de agendamento, o dhup está multiplicando as linhas
+select * --countar distinto os id de agendamento, o dhup está multiplicando as linhas
 from stg_agendamento_procedimentos ap
 left join stg_agendamentos ag on ap.agendamento_id = ag.id
 left join stg_pacientes sp on sp.id = ag.paciente_id
@@ -53,6 +53,7 @@ and ag."data" between date('2023-11-01') and date ('2023-11-26')
 --group by u.id
 --order by u.id
 
+
 select tcah.id_unidade, count(distinct tcah.id_agendamento) 
 from tb_consolidacao_agendamentos_hist tcah 
 where datadoatendimento between ('2023-11-01') and ('2023-11-26')
@@ -64,3 +65,4 @@ order by tcah.id_unidade ASC
 SELECT * FROM stg_unidades su 
 where su.id = 19653
 LIMIT 10
+

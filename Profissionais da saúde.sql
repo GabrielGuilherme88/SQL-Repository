@@ -3,7 +3,7 @@ select
 	sp.cpf ,
 	count(*)
 from
-	stg_profissionais sp
+	todos_data_lake_trusted_feegow.profissionais sp
 where
 	sp.sys_active = 1
 group by
@@ -16,7 +16,7 @@ order by
 select
 	*
 from
-	stg_profissionais sp
+	todos_data_lake_trusted_feegow.profissionais sp
 where
 	sp.cpf is null
 	--query para buscar profissionais com cpf >2
@@ -29,12 +29,12 @@ select
 	sp.rqe,
 	spe2.estado
 from
-	stg_profissionais sp
-	--left join stg_profissional_especialidades spe on spe.profissional_id = sp.id
-	--left join stg_especialidades se on se.id = spe.especialidade_id
-left join stg_profissional_enderecos spe2 on
+	todos_data_lake_trusted_feegow.profissionais sp
+	--left join todos_data_lake_trusted_feegow.profissional_especialidades spe on spe.profissional_id = sp.id
+	--left join todos_data_lake_trusted_feegow.especialidades se on se.id = spe.especialidade_id
+left join todos_data_lake_trusted_feegow.profissional_enderecos spe2 on
 	spe2.profisional_id = sp.id
-left join stg_conselhos_profissionais scp on
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on
 	scp.id = sp.conselho_id
 where
 	sp.sys_active = 1
@@ -42,7 +42,7 @@ where
 	select
 		sp2.cpf
 	from
-		stg_profissionais sp2
+		todos_data_lake_trusted_feegow.profissionais sp2
 	where
 		sp2.sys_active = 1
 	group by
@@ -72,20 +72,20 @@ select
 	su.nome_fantasia,
 	sur.descricao as regiao_franquia
 from
-	stg_profissionais sp
-left join stg_profissional_enderecos spe2 on
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissional_enderecos spe2 on
 	spe2.profisional_id = sp.id
-left join stg_conselhos_profissionais scp on
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on
 	scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on
 	spe.profissional_id = sp.id
-left join stg_especialidades se on
+left join todos_data_lake_trusted_feegow.especialidades se on
 	se.id = spe.especialidade_id
-left join stg_profissionais_unidades spu on
+left join todos_data_lake_trusted_feegow.profissionais_unidades spu on
 	spu.profissional_id = sp.id
-left join stg_unidades su on
+left join todos_data_lake_trusted_feegow.unidades su on
 	su.id = spu.unidade_id
-left join stg_unidades_regioes sur on
+left join todos_data_lake_trusted_feegow.unidades_regioes sur on
 	sur.id = su.regiao_id
 where
 	1 = 1
@@ -95,7 +95,8 @@ where
 	--ativo interface
 	--and sur.descricao in ('SP CAV', 'SP Interior')
 	and sp.nome_profissional = 'Jesus Da Cunha Garcia'
-	and su.id not in (19774, 0, 19793)
+	and su.id = 19682
+	--and su.id not in (19774, 0, 19793)
 	--validando o cadastro de RQE do profissional
 	--query no metabase alimentando (CURITIBA) CREMESP - Profissionais Ativos Unidades
 	
@@ -107,6 +108,8 @@ select
 	distinct 
 sp.id as id_profissional,
 	sp.nome_profissional,
+	sp.ativo,
+	sp.sys_active,
 	sp.nascimento,
 	sp.conselho_id,
 	sp.nascimento,
@@ -120,24 +123,22 @@ sp.id as id_profissional,
 	se.nome_especialidade,
 	su.nome_fantasia
 from
-	stg_profissionais sp
-left join stg_profissional_especialidades spe on
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on
 	spe.profissional_id = sp.id
-left join stg_especialidades se on
+left join todos_data_lake_trusted_feegow.especialidades se on
 	se.id = spe.especialidade_id
-left join stg_conselhos_profissionais scp on
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on
 	scp.id = sp.conselho_id
-left join stg_profissionais_unidades spu on
+left join todos_data_lake_trusted_feegow.profissionais_unidades spu on
 	spu.profissional_id = sp.id
-left join stg_unidades su on
+left join todos_data_lake_trusted_feegow.unidades su on
 	su.id = spu.unidade_id
 where
 	1 = 1
-	and sp.sys_active = 1
-	and sp.ativo = 'on'
-	and su.id in (19283, 19475, 19276)
-	--and sp.nome_profissional = 'Jesus Da Cunha Garcia' --profissional para validar
-	--para validar a inclusão do novo campo da feegow
+	and sp.sys_active <> 1 --filtro pegando inativos (só alterar)
+	and sp.ativo <> 'on' --filtro pegando inativos
+	and su.id = 19682
 	
 	
 	
@@ -147,15 +148,15 @@ select
 	count(*),
 	spe.rqe
 from
-	stg_profissional_especialidades spe
+	todos_data_lake_trusted_feegow.profissional_especialidades spe
 group by
 	spe.rqe
 	--validando se profissionais_unidades está sendo atualizada conforme profissionais_unidades
 select
 	distinct *
 from
-	stg_profissionais sp
-left join stg_profissionais_unidades spu on
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissionais_unidades spu on
 	spu.profissional_id = sp.id
 where
 	sp.nome_profissional = 'Maximilian Porley Hornos Dos Santos'
@@ -184,22 +185,22 @@ select
 	su.nome_fantasia,
 	sur.descricao as regiao_franquia
 from
-	stg_grade_fixa sgf
-left join stg_locais sl on
+	todos_data_lake_trusted_feegow.grade_fixa sgf
+left join todos_data_lake_trusted_feegow.locais sl on
 	sl.id = sgf.localid
-left join stg_unidades su on
+left join todos_data_lake_trusted_feegow.unidades su on
 	su.id = sl.unidade_id
-left join stg_profissionais sp on
+left join todos_data_lake_trusted_feegow.profissionais sp on
 	sp.id = sgf.profissionalid
-left join stg_conselhos_profissionais scp on
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on
 	scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on
 	spe.profissional_id = sp.id
-left join stg_especialidades se on
+left join todos_data_lake_trusted_feegow.especialidades se on
 	se.id = spe.especialidade_id
-left join stg_profissionais_unidades spu on
+left join todos_data_lake_trusted_feegow.profissionais_unidades spu on
 	spu.profissional_id = sp.id
-left join stg_unidades_regioes sur on
+left join todos_data_lake_trusted_feegow.unidades_regioes sur on
 	sur.id = su.regiao_id
 where
 	1 = 1
@@ -228,10 +229,10 @@ select
 	TO_CHAR(sp.dhup,
 	'HH24:MI:SS') as hora_atualizacao
 from
-	stg_profissionais sp
-left join stg_conselhos_profissionais scp on
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on
 	scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on
 	spe.profissional_id = sp.id
 where
 	1 = 1
@@ -259,7 +260,7 @@ with qtde_cpf as (
 select sp.cpf as id_cpf,
 	count(distinct sp.id) as id_por_cpf_sysactive1
 from
-	stg_profissionais sp
+	todos_data_lake_trusted_feegow.profissionais sp
 where sp.sys_active = 1	
 and sp.ativo = 'on'
 group by
@@ -289,27 +290,28 @@ select	distinct
 	sf.nome_funcionario,
 	su.tipo_usuario 
 from
-	stg_profissionais sp
-left join stg_conselhos_profissionais scp on	scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on	spe.profissional_id = sp.id
-left join stg_especialidades e on	e.id = spe.especialidade_id
-left join stg_profissionais_unidades puu on	puu.profissional_id = sp.id
-left join stg_unidades uu on	uu.id = puu.unidade_id
-left join stg_unidades_regioes ur on	ur.id = uu.regiao_id
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on	scp.id = sp.conselho_id
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on	spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on	e.id = spe.especialidade_id
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on	puu.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.unidades uu on	uu.id = puu.unidade_id
+left join todos_data_lake_trusted_feegow.unidades_regioes ur on	ur.id = uu.regiao_id
 left join qtde_cpf qc on	qc.id_cpf = sp.cpf
-left join stg_usuarios su on su.id = sp.sys_user
-left join stg_funcionarios sf on sf.id = su.id_relativo
+left join todos_data_lake_trusted_feegow.usuarios su on su.id = sp.sys_user
+left join todos_data_lake_trusted_feegow.funcionarios sf on sf.id = su.id_relativo
 	--left join com objeto qtde_cpf para identificar quantos cpf existem por profissional
 where
 	1 = 1
 	and sp.id not in (
-						select sp.id from stg_profissionais sp 
-						where sp.dhup between current_date - 30 and current_date - 1) --retirar profissionais atualziados nos últimos 15 dias (d-1)
+						select sp.id from todos_data_lake_trusted_feegow.profissionais sp 
+						WHERE sp.dhup BETWEEN date_add('day', -30, current_date) AND date_add('day', -1, current_date)
+						--where sp.dhup between current_date - 30 and current_date - 1) --retirar profissionais atualziados nos últimos 15 dias (d-1)
 	and sp.sys_active = 1
 	and sp.ativo = 'on'
 	and uu.id not in (0, 19774, 19793)
 	--faixa de data de 15 dias do seu cadastro
-),
+)),
 -- O objeto abaixo separa os agendamentos futuros dos profissionais contando os agendamentos ocorridos na data mais recente do banco (d-1) e
 -- os futuros. Ou seja, caso o profissional tenha algum agendamento no futuro ou na data de hoje(d-1) é considerado como ativo
 atendimento_60d as (
@@ -317,15 +319,16 @@ select
 	prof.id as id_profissional_futuro,
 	count(*) as qtde
 from
-	stg_agendamento_procedimentos ap
-left join stg_agendamentos ag on ap.agendamento_id = ag.id
-left join stg_profissionais prof on	ag.profissional_id = prof.id
-left join stg_especialidades esp on	ag.especialidade_id = esp.id
-left join stg_procedimentos pro on	ap.procedimento_id = pro.id
-left join stg_procedimentos_tipos sprot on	pro.tipo_procedimento_id = sprot.id
+	todos_data_lake_trusted_feegow.agendamento_procedimentos ap
+left join todos_data_lake_trusted_feegow.agendamentos ag on ap.agendamento_id = ag.id
+left join todos_data_lake_trusted_feegow.profissionais prof on	ag.profissional_id = prof.id
+left join todos_data_lake_trusted_feegow.especialidades esp on	ag.especialidade_id = esp.id
+left join todos_data_lake_trusted_feegow.procedimentos pro on	ap.procedimento_id = pro.id
+left join todos_data_lake_trusted_feegow.procedimentos_tipos sprot on	pro.tipo_procedimento_id = sprot.id
 where
 	1 = 1
-	and ag."data" between current_date - 60 and date('2030-01-01')
+	--and ag."data" between current_date - 60 and date('2030-01-01')
+	AND ag."data" BETWEEN date_add('day', -60, current_date) AND date '2030-01-01'
 	--and sprot.id in (2, 9) --retirando consulta e retorno
 and ag.status_id in (33, 207, 202, 2, 200, 203, 5, 204, 201, 205, 4, 206, 3)
 	group by
@@ -336,15 +339,16 @@ select
 	prof.id as id_profissional_futuro_agendamento,
 	count(*) as qtde
 from
-	stg_agendamento_procedimentos ap
-left join stg_agendamentos ag on ap.agendamento_id = ag.id
-left join stg_profissionais prof on	ag.profissional_id = prof.id
-left join stg_especialidades esp on	ag.especialidade_id = esp.id
-left join stg_procedimentos pro on	ap.procedimento_id = pro.id
-left join stg_procedimentos_tipos sprot on	pro.tipo_procedimento_id = sprot.id
+	todos_data_lake_trusted_feegow.agendamento_procedimentos ap
+left join todos_data_lake_trusted_feegow.agendamentos ag on ap.agendamento_id = ag.id
+left join todos_data_lake_trusted_feegow.profissionais prof on	ag.profissional_id = prof.id
+left join todos_data_lake_trusted_feegow.especialidades esp on	ag.especialidade_id = esp.id
+left join todos_data_lake_trusted_feegow.procedimentos pro on	ap.procedimento_id = pro.id
+left join todos_data_lake_trusted_feegow.procedimentos_tipos sprot on	pro.tipo_procedimento_id = sprot.id
 where
 	1 = 1
-	and ag."data" between current_date  and date('2030-01-01')
+	--and ag."data" between current_date  and date('2030-01-01')
+	AND ag."data" BETWEEN current_date AND date('2030-01-01')
 	and sprot.id in (2, 9) --retirando consulta e retorno
 	group by
 		prof.id
@@ -353,30 +357,32 @@ grade_futuras_fixas as (
 select 
 	distinct sp.id as id_profissional_grade
 from
-	stg_grade_fixa sgf
-left join stg_profissionais sp on sp.id = sgf.profissionalid
+	todos_data_lake_trusted_feegow.grade_fixa sgf
+left join todos_data_lake_trusted_feegow.profissionais sp on sp.id = sgf.profissionalid
 where
 	1 = 1
 	and sp.sys_active = 1
 	and sp.ativo = 'on'
 	--and sgf.inicio_vigencia between current_date - 1 and date('2030-12-31')
 	-- pega profissionais que tiveram alguma grade aberta em 60 dias com a data corrente de hoje
-	and sgf.fim_vigencia between current_date -1 and date('2030-12-31')
+	--and sgf.fim_vigencia between current_date -1 and date('2030-12-31')
+	AND sgf.fim_vigencia BETWEEN date_add('day', -1, current_date) AND date '2030-12-31'
 	-- pega todas as grades com fim de vigencia (em aberto) a partir de hoje até o futuro		
 ),
 grade_futuras_periodo as (
 select 
 	distinct sp.id as id_profissional_grade_periodo
 from
-	stg_grade_periodo sgp
-left join stg_profissionais sp on	sp.id = sgp.profissional_id
+	todos_data_lake_trusted_feegow.grade_periodo sgp
+left join todos_data_lake_trusted_feegow.profissionais sp on	sp.id = sgp.profissional_id
 where
 	1 = 1
 	and sp.sys_active = 1
 	and sp.ativo = 'on'
 	--and sgp.data_de between current_date -1 and date('2030-12-31')
 	--pega todas as grades com fim de vigencia (em aberto) a partir de hoje até o futuro
-	and sgp.data_ate between current_date - 1 and date('2030-12-31')
+	--and sgp.data_ate between current_date - 1 and date('2030-12-31')
+	AND sgp.data_ate BETWEEN date_add('day', -1, current_date) AND date '2030-12-31'
 	-- pega profissionais que tiveram alguma grade aberta em 60 dias com a data corrente de hoje
 ),
 --O objeto abaixo consolida os objetos acima, ou seja, faz o left join e retira-se qualquer informação em comum.
@@ -428,16 +434,16 @@ where
 	--separar profissional para validação. O mesmo aparece na lista pois possui dois id diferentes para o mesmo cpf e também sysuser = 0 --conversar com a marjorie sobre o sys user = 0
 and id not in
 ( --retirando profissionais que possuem a central como unidade cadastrada
-select  distinct sp.id from stg_profissionais sp
-left join stg_profissionais_unidades puu on	puu.profissional_id = sp.id
-left join stg_unidades uu on	uu.id = puu.unidade_id
+select  distinct sp.id from todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on	puu.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.unidades uu on	uu.id = puu.unidade_id
 where uu.id in (0, 19774, 19793)
 )
 and id not in
 ( --retirando profissionais que tem a especialidade 256	Biomedicina 168	Enfermagem
-select sp.id from stg_profissionais sp
-left join stg_profissional_especialidades spe on	spe.profissional_id = sp.id
-left join stg_especialidades e on	e.id = spe.especialidade_id
+select sp.id from todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on	spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on	e.id = spe.especialidade_id
 where e.id in (256, 168)
 )
 --and id = 503578
@@ -445,14 +451,15 @@ order by
 	nome_profissional
 	
 	
---para validação
 
+	
+--para validação
 select
 	*
 from
-	stg_profissionais sp
-left join stg_profissional_especialidades spe on	spe.profissional_id = sp.id
-left join stg_especialidades e on	e.id = spe.especialidade_id
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on	spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on	e.id = spe.especialidade_id
 where
 	1 = 1
 and sp.id = 513906
@@ -474,8 +481,8 @@ and sp.id = 513906
 select
 	*
 from
-	stg_grade_fixa sgf
-left join stg_profissionais sp on
+	todos_data_lake_trusted_feegow.grade_fixa sgf
+left join todos_data_lake_trusted_feegow.profissionais sp on
 	sp.id = sgf.profissionalid
 where
 	1 = 1
@@ -495,8 +502,8 @@ order by
 select 
 	*
 from
-	stg_grade_periodo sgp
-left join stg_profissionais sp on
+	todos_data_lake_trusted_feegow.grade_periodo sgp
+left join todos_data_lake_trusted_feegow.profissionais sp on
 	sp.id = sgp.profissional_id
 where
 	1 = 1
@@ -514,16 +521,16 @@ and sp.ativo = 'on' and sp.sys_active = 1
 select
 	*
 from
-	stg_agendamento_procedimentos ap
-left join stg_agendamentos ag on
+	todos_data_lake_trusted_feegow.agendamento_procedimentos ap
+left join todos_data_lake_trusted_feegow.agendamentos ag on
 	ap.agendamento_id = ag.id
-left join stg_profissionais prof on
+left join todos_data_lake_trusted_feegow.profissionais prof on
 	ag.profissional_id = prof.id
-left join stg_especialidades esp on
+left join todos_data_lake_trusted_feegow.especialidades esp on
 	ag.especialidade_id = esp.id
-left join stg_procedimentos pro on
+left join todos_data_lake_trusted_feegow.procedimentos pro on
 	ap.procedimento_id = pro.id
-left join stg_procedimentos_tipos sprot on
+left join todos_data_lake_trusted_feegow.procedimentos_tipos sprot on
 	pro.tipo_procedimento_id = sprot.id
 where
 	1 = 1
@@ -547,18 +554,18 @@ select
 	TO_CHAR(sp.dhup,
 	'HH24:MI:SS') as hora_atualizacao
 from
-	stg_profissionais sp
-left join stg_conselhos_profissionais scp on
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on
 	scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on
 	spe.profissional_id = sp.id
-left join stg_especialidades e on
+left join todos_data_lake_trusted_feegow.especialidades e on
 	e.id = spe.especialidade_id
-left join stg_profissionais_unidades puu on
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on
 	puu.profissional_id = sp.id
-left join stg_unidades uu on
+left join todos_data_lake_trusted_feegow.unidades uu on
 	uu.id = puu.unidade_id
-left join stg_unidades_regioes sur on
+left join todos_data_lake_trusted_feegow.unidades_regioes sur on
 	sur.id = uu.regiao_id
 where
 	1 = 1
@@ -566,7 +573,7 @@ where
 	--faixa de data de 15 dias do seu cadastro
 	and sp.nome_profissional = 'Adriana Cardoso Gonçalves'
 	
-SELECT * FROM stg_unidades
+SELECT * FROM todos_data_lake_trusted_feegow.unidades
 	
 --demanda do CRM	
 --para separar os profissionais por ; com a função listagg	
@@ -588,14 +595,14 @@ SELECT * FROM stg_unidades
 	listagg(uu.id, '; ') as unidade_id,
 	listagg(uu.nome_fantasia, '; ') as nome_fantasia
 from
-	stg_profissionais sp
-left join stg_conselhos_profissionais scp on scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on spe.profissional_id = sp.id
-left join stg_profissional_enderecos spe2 on spe2.profisional_id = sp.id
-left join stg_especialidades e on e.id = spe.especialidade_id
-left join stg_profissionais_unidades puu on	puu.profissional_id = sp.id
-left join stg_unidades uu on uu.id = puu.unidade_id
-left join stg_unidades_regioes sur on sur.id = uu.regiao_id
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on scp.id = sp.conselho_id
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.profissional_enderecos spe2 on spe2.profisional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on e.id = spe.especialidade_id
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on	puu.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.unidades uu on uu.id = puu.unidade_id
+left join todos_data_lake_trusted_feegow.unidades_regioes sur on sur.id = uu.regiao_id
 where 1=1
 and sp.sys_active = 1 and sp.ativo = 'on'
 group by sp.id,
@@ -622,13 +629,13 @@ order by sp.id
 with exclusao as ( --objeto criado para apontar os id de profissionais da central amor saude cujo id 19774, 19793, 0
 select sp.id as id_prof 
 from
-	stg_profissionais sp
-left join stg_conselhos_profissionais scp on	scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on	spe.profissional_id = sp.id
-left join stg_especialidades e on	e.id = spe.especialidade_id
-left join stg_profissionais_unidades puu on	puu.profissional_id = sp.id
-left join stg_unidades uu on	uu.id = puu.unidade_id
-left join stg_unidades_regioes ur on	ur.id = uu.regiao_id
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on	scp.id = sp.conselho_id
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on	spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on	e.id = spe.especialidade_id
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on	puu.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.unidades uu on	uu.id = puu.unidade_id
+left join todos_data_lake_trusted_feegow.unidades_regioes ur on	ur.id = uu.regiao_id
 where 1 = 1
 and uu.id in (19774, 19793, 0)
 ),
@@ -655,13 +662,13 @@ select	distinct
 	date(sp.dhup) as dhup,
 	sp.sys_date as sys_date
 from
-	stg_profissionais sp
-left join stg_conselhos_profissionais scp on	scp.id = sp.conselho_id
-left join stg_profissional_especialidades spe on	spe.profissional_id = sp.id
-left join stg_especialidades e on	e.id = spe.especialidade_id
-left join stg_profissionais_unidades puu on	puu.profissional_id = sp.id
-left join stg_unidades uu on	uu.id = puu.unidade_id
-left join stg_unidades_regioes ur on	ur.id = uu.regiao_id
+	todos_data_lake_trusted_feegow.profissionais sp
+left join todos_data_lake_trusted_feegow.conselhos_profissionais scp on	scp.id = sp.conselho_id
+left join todos_data_lake_trusted_feegow.profissional_especialidades spe on	spe.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.especialidades e on	e.id = spe.especialidade_id
+left join todos_data_lake_trusted_feegow.profissionais_unidades puu on	puu.profissional_id = sp.id
+left join todos_data_lake_trusted_feegow.unidades uu on	uu.id = puu.unidade_id
+left join todos_data_lake_trusted_feegow.unidades_regioes ur on	ur.id = uu.regiao_id
 where
 	1 = 1
 	and sp.sys_active = 1
@@ -675,3 +682,5 @@ where 1 = 1
 and pp.id_profissional not in ( --realizando a exclusão dos profissionais do primeiro objeto
 	select * from exclusao)
 order by id_profissional
+
+

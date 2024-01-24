@@ -73,7 +73,8 @@ left join u on pu.unidade_id = u.id
 
 
 
-
+select * from pdgt_amorsaude_financeiro.fl_contas_a_receber_vmk v
+where v.datapagamento between date('2024-01-07') and date('2024-01-13')
 
 
 

@@ -113,17 +113,16 @@ and sys_user  <> 0
 and sp.cpf = '51267258829'
 or sp.cpf like  '	51267258829'
 
+--para cruzar com o crm do cartao
+with cpf_unico as (
+select count(*) qtde, cpf from pdgt_sandbox_gabrielguilherme.fl_consultas_crm
+where cpf is not null
+group by cpf
+having count(*) = 1
+order by count(*) desc)
+select crm.cpf as CPF, crm.id_paciente, crm.sexo, crm.total_consulta, crm.ultima_consulta, crm.tempo_sem_uso, crm."2020", crm."2021", crm."2022", crm."2023", crm."2024", 
+crm.last_date_clinica_medica, crm.last_date_oftalmologia, crm.last_date_ginecologia ,crm.last_date_ortopedia, crm.last_date_cardiologia  
+from pdgt_sandbox_gabrielguilherme.fl_consultas_crm crm
+inner join cpf_unico as c on c.cpf = crm.cpf
 
-with cpf as 
-(
-select TRIM(sp.cpf), count(sp.id)
-from stg_pacientes sp
-where sp.sys_active = 1
-and sp.sys_user <> 0
-group by sp.cpf
-having count(sp.id) > 1
-) 
-select * from cpf
 
-SELECT * FROM tb_consolidacao_contas_a_receber_hist_nova tccarhn 
-limit 1

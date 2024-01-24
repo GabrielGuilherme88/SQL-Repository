@@ -6,14 +6,18 @@ SELECT
 	pcts.Sexo, 
 	p.modelo as modelo_prontuario, 
 	p.Texto as conteudo_prontuario,
-	p.DataHora
+	p.DataHora,
+	p2.NomeProfissional 
 FROM Mychesys.dbo.Prontuario p
 left join Mychesys.dbo.Paciente pcts on p.PacienteID = pcts.id
 left join Mychesys.dbo.Clinica c on p.Id_Clinica = c.id_Clinica
+left join Mychesys.dbo.Profissional p2 on p2.id = p.profissional
 where 1=1
-and TRIM(pcts.CPF) = '03466995760'
+and TRIM(pcts.CPF) = '15558420898'
+or pcts.CPF = '15558420898'
 --and pcts.NomePaciente = 'Vanessa Coelho Lemões'
 --and p.DataHora BETWEEN '2020-12-01 00:00:00' and '2020-12-31 23:59:00'
+
 
 
 
@@ -34,7 +38,7 @@ left join Mychesys.dbo.Paciente p on p.id = a.PacienteID
 left join Mychesys.dbo.procedimento p2 on p2.ID_PROCEDIMENTO = a.ProcedimentoID
 left join Mychesys.dbo.Profissional pp2 on pp2.id = a.ProfissionalID  
 where 1=1
-and p.CPF = '03466995760'
+and p.CPF = '15558420898'
 
 
 --2
